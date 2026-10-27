@@ -1,0 +1,294 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  /* One sans for everything (Linear-like): `font-serif` classes from vo2 read as sans too. */
+  --font-serif: var(--font-inter), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+}
+
+/*
+ * Linear-like: neutral greys, one indigo accent, quiet surfaces, code that stands out.
+ * Every colour is set here.
+ */
+:root {
+  color-scheme: light dark;
+  --bg: #fbfbfc;
+  --ink: #16171b;
+  --muted: #6b6f7b;
+  --line: #e6e7eb;
+  --field: #ffffff;
+  --brand: #5e6ad2;
+  --brand-soft: #eef0fc;
+  --brand-fill: #5e6ad2;
+  --right: #1f8a4c;
+  --right-soft: #e5f4ea;
+  --wrong: #d1343f;
+  --wrong-soft: #fbe8e9;
+  --code-bg: #f3f4f7;
+  --code-ink: #23252c;
+  --shadow: 0 1px 2px rgb(16 18 27 / 0.05);
+
+  --glow-1: rgb(94 106 210 / 0.07);
+  --glow-2: rgb(120 130 160 / 0.05);
+  --glass: linear-gradient(180deg, rgb(255 255 255 / 0.86), rgb(255 255 255 / 0.78));
+  --glass-solid: rgb(255 255 255 / 0.96);
+  --glass-card: rgb(255 255 255 / 0.85);
+  --rim: rgb(255 255 255 / 0.9);
+  --rim-out: rgb(16 18 27 / 0.08);
+  --lift: 0 10px 30px rgb(16 18 27 / 0.12), 0 2px 6px rgb(16 18 27 / 0.05);
+  --pill: rgb(94 106 210 / 0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1012;
+    --ink: #e8e9ed;
+    --muted: #8a8f98;
+    --line: #26282d;
+    --field: #16171a;
+    --brand: #8d97f0;
+    --brand-soft: #1f2238;
+    --brand-fill: #5e6ad2;
+    --right: #4cc782;
+    --right-soft: #13291c;
+    --wrong: #f2727b;
+    --wrong-soft: #321719;
+    --code-bg: #17181c;
+    --code-ink: #d9dbe3;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+
+    --glow-1: rgb(94 106 210 / 0.1);
+    --glow-2: rgb(120 130 160 / 0.04);
+    --glass: linear-gradient(180deg, rgb(32 33 38 / 0.84), rgb(20 21 25 / 0.8));
+    --glass-solid: rgb(22 23 27 / 0.96);
+    --glass-card: rgb(24 25 29 / 0.72);
+    --rim: rgb(255 255 255 / 0.06);
+    --rim-out: rgb(255 255 255 / 0.07);
+    --lift: 0 10px 30px rgb(0 0 0 / 0.5);
+    --pill: rgb(255 255 255 / 0.1);
+  }
+}
+
+body {
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-tap-highlight-color: transparent;
+}
+/* The page the glass sits on; fixed (iOS ignores background-attachment: fixed). */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(70% 45% at 0% 0%, var(--glow-1), transparent 70%),
+    radial-gradient(60% 40% at 100% 35%, var(--glow-2), transparent 70%), var(--bg);
+}
+
+@layer components {
+  /* Glass card: translucent paper, bright top rim. No blur, so long lists stay smooth. */
+  .card {
+    @apply rounded-xl border p-4;
+    background: var(--glass-card);
+    border-color: var(--rim-out);
+    box-shadow:
+      inset 0 1px 0 var(--rim),
+      var(--shadow);
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border px-5 py-3.5 text-center text-[0.95rem] font-medium transition-[scale,background-color] duration-100 select-none disabled:opacity-40;
+    background: var(--glass-card);
+    border-color: var(--rim-out);
+    box-shadow: inset 0 1px 0 var(--rim);
+    color: var(--ink);
+  }
+  .btn:focus-visible,
+  .field:focus-visible,
+  a:focus-visible,
+  summary:focus-visible,
+  button:focus-visible {
+    outline: 3px solid var(--brand);
+    outline-offset: 2px;
+  }
+  .btn:active:not(:disabled) {
+    @apply scale-[0.98];
+  }
+  .btn-primary {
+    background: var(--brand-fill);
+    border-color: var(--brand-fill);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18);
+    color: white;
+  }
+
+  .field {
+    @apply rounded-xl border px-4 py-3 outline-none;
+    background: var(--field);
+    border-color: var(--line);
+  }
+
+  .muted {
+    color: var(--muted);
+  }
+  .line {
+    border-color: var(--line);
+  }
+  /* Small label above a section. */
+  .eyebrow {
+    @apply text-xs font-medium tracking-[0.04em] uppercase;
+    color: var(--muted);
+  }
+
+  .screen {
+    @apply mx-auto flex min-h-dvh max-w-xl flex-col gap-5 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-6;
+  }
+  .with-tabs {
+    @apply pb-[calc(6.5rem+env(safe-area-inset-bottom))];
+  }
+
+  /* Reading text: comfortable size and line height on a phone. */
+  .prose-text {
+    @apply text-[1.05rem] leading-[1.65];
+  }
+
+  /* Code: a quiet panel, sized so 46 characters fit an iPhone (content-check keeps lines short). */
+  .code-block {
+    @apply overflow-x-auto rounded-xl border px-3 py-2.5 font-mono text-[12.5px] leading-[1.6];
+    background: var(--code-bg);
+    color: var(--code-ink);
+    border-color: var(--line);
+  }
+  :not(pre) > code {
+    @apply rounded-md px-1 py-0.5 font-mono text-[0.88em];
+    background: var(--code-bg);
+  }
+}
+
+/* Native popovers (glossary terms, source marks, flag form): frosted glass. */
+[popover] {
+  @apply m-auto max-w-sm rounded-2xl border p-4;
+  background: var(--glass-solid);
+  color: var(--ink);
+  border-color: var(--rim-out);
+  box-shadow:
+    inset 0 1px 0 var(--rim),
+    var(--lift);
+}
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  [popover] {
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(24px) saturate(170%);
+    backdrop-filter: blur(24px) saturate(170%);
+  }
+}
+[popover]::backdrop {
+  background: rgb(0 0 0 / 0.25);
+}
+
+/* Loading feedback for Go links (Nav.tsx): appears after 150 ms, so fast taps show none. */
+.pending-bar {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 50;
+  height: 3px;
+  background: var(--brand);
+  pointer-events: none;
+  animation:
+    pending-show 0s 150ms both,
+    pending-grow 1.2s 150ms ease-out both;
+  opacity: 0;
+  transform-origin: left;
+}
+@keyframes pending-show {
+  to {
+    opacity: 1;
+  }
+}
+@keyframes pending-grow {
+  from {
+    transform: scaleX(0.1);
+  }
+  to {
+    transform: scaleX(0.9);
+  }
+}
+
+/* Dock: the floating glass tab bar (Dock.tsx). */
+.dock {
+  position: fixed;
+  z-index: 20;
+  left: max(12px, env(safe-area-inset-left, 0px));
+  right: max(12px, env(safe-area-inset-right, 0px));
+  bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  max-width: 26rem;
+  margin: 0 auto;
+}
+.glass {
+  position: relative;
+  border-radius: 999px;
+  background: var(--glass-solid);
+  border: 0.5px solid var(--rim-out);
+  box-shadow:
+    inset 0 1px 0 var(--rim),
+    var(--lift);
+}
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .glass {
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(22px) saturate(180%);
+    backdrop-filter: blur(22px) saturate(180%);
+  }
+}
+.dock-tabs {
+  display: grid;
+  grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+  height: 62px;
+  padding: 5px;
+  margin: 0;
+  list-style: none;
+}
+/* The selected tab's lens: a tinted pill sliding between equal columns. */
+.dock-pill {
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  left: 5px;
+  width: calc((100% - 10px) / var(--n));
+  border-radius: 999px;
+  background: var(--pill);
+  box-shadow: inset 0 1px 0 var(--rim);
+  transform: translateX(calc(var(--i) * 100%));
+  transition: transform 0.42s cubic-bezier(0.32, 1.25, 0.5, 1);
+}
+.dock-tab {
+  position: relative;
+  height: 100%;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 2px;
+  font-size: 0.68rem;
+  font-weight: 650;
+  color: var(--muted);
+}
+.dock-tab svg {
+  width: 24px;
+  height: 24px;
+  transition: transform 0.3s cubic-bezier(0.32, 1.25, 0.5, 1);
+}
+.dock-tab[aria-current="page"] {
+  color: var(--brand);
+}
+.dock-tab[aria-current="page"] svg {
+  fill: color-mix(in srgb, var(--brand) 16%, transparent);
+  transform: translateY(-1px) scale(1.06);
+}
+@media (prefers-reduced-motion: reduce) {
+  .dock-pill,
+  .dock-tab svg {
+    transition: none;
+  }
+}

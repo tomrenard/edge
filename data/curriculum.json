@@ -1,0 +1,626 @@
+[
+  {
+    "id": "js",
+    "title": "JS and TS",
+    "modules": [
+      {
+        "id": "js-event-loop",
+        "title": "Event loop",
+        "icon": "⟳",
+        "lessons": [
+          "el-tasks",
+          "el-microtasks",
+          "el-async-await",
+          "el-rendering",
+          "el-node"
+        ]
+      },
+      {
+        "id": "js-coercion",
+        "title": "Coercion and equality",
+        "icon": "≡",
+        "lessons": []
+      },
+      {
+        "id": "js-scope",
+        "title": "Scope and closures",
+        "icon": "{}",
+        "lessons": []
+      },
+      {
+        "id": "js-this",
+        "title": "this, prototypes, classes",
+        "icon": "⊂",
+        "lessons": []
+      },
+      {
+        "id": "js-promises",
+        "title": "Promises and cancellation",
+        "icon": "⋯",
+        "lessons": []
+      },
+      {
+        "id": "js-iterators",
+        "title": "Iterators, generators, Proxy",
+        "icon": "↻",
+        "lessons": []
+      },
+      {
+        "id": "js-modules",
+        "title": "Modules: ESM and CJS",
+        "icon": "⧉",
+        "lessons": []
+      },
+      {
+        "id": "js-memory",
+        "title": "Memory and V8",
+        "icon": "▦",
+        "lessons": []
+      },
+      {
+        "id": "ts-narrowing",
+        "title": "TS: inference and narrowing",
+        "icon": "T",
+        "lessons": []
+      },
+      {
+        "id": "ts-generics",
+        "title": "TS: generics and type-level",
+        "icon": "T",
+        "lessons": []
+      },
+      {
+        "id": "ts-practice",
+        "title": "TS in practice",
+        "icon": "T",
+        "lessons": []
+      },
+      {
+        "id": "js-modern",
+        "title": "Modern JS",
+        "icon": "✦",
+        "lessons": []
+      }
+    ]
+  },
+  {
+    "id": "web",
+    "title": "Browser and web platform",
+    "modules": [
+      {
+        "id": "web-rendering",
+        "title": "Rendering pipeline",
+        "icon": "▤",
+        "lessons": []
+      },
+      {
+        "id": "web-vitals",
+        "title": "Core Web Vitals",
+        "icon": "◔",
+        "lessons": []
+      },
+      {
+        "id": "web-loading",
+        "title": "Loading performance",
+        "icon": "↓",
+        "lessons": []
+      },
+      {
+        "id": "web-caching",
+        "title": "HTTP caching and service workers",
+        "icon": "⧖",
+        "lessons": []
+      },
+      {
+        "id": "web-network",
+        "title": "HTTP, CORS, cookies",
+        "icon": "⇄",
+        "lessons": []
+      },
+      {
+        "id": "web-security",
+        "title": "Web security",
+        "icon": "⛨",
+        "lessons": []
+      },
+      {
+        "id": "web-a11y",
+        "title": "Accessibility",
+        "icon": "◎",
+        "lessons": []
+      },
+      {
+        "id": "web-css",
+        "title": "Modern CSS",
+        "icon": "#",
+        "lessons": []
+      },
+      {
+        "id": "web-apis",
+        "title": "Web APIs",
+        "icon": "⌁",
+        "lessons": []
+      }
+    ]
+  },
+  {
+    "id": "react",
+    "title": "React and frameworks",
+    "modules": [
+      {
+        "id": "react-render",
+        "title": "Render model",
+        "icon": "⚛",
+        "lessons": []
+      },
+      {
+        "id": "react-effects",
+        "title": "State and effects",
+        "icon": "⚛",
+        "lessons": []
+      },
+      {
+        "id": "react-perf",
+        "title": "Performance and React Compiler",
+        "icon": "⚛",
+        "lessons": []
+      },
+      {
+        "id": "react-concurrent",
+        "title": "Concurrent React",
+        "icon": "⚛",
+        "lessons": []
+      },
+      {
+        "id": "react-19",
+        "title": "React 19",
+        "icon": "⚛",
+        "lessons": []
+      },
+      {
+        "id": "react-rsc",
+        "title": "Server Components",
+        "icon": "⚛",
+        "lessons": []
+      },
+      {
+        "id": "next-app",
+        "title": "Next.js App Router",
+        "icon": "▲",
+        "lessons": []
+      },
+      {
+        "id": "tanstack-query",
+        "title": "TanStack Query",
+        "icon": "◇",
+        "lessons": []
+      },
+      {
+        "id": "tanstack-router",
+        "title": "TanStack Router and Start",
+        "icon": "◇",
+        "lessons": []
+      },
+      {
+        "id": "astro",
+        "title": "Astro",
+        "icon": "✶",
+        "lessons": []
+      },
+      {
+        "id": "fe-patterns",
+        "title": "Component patterns",
+        "icon": "❖",
+        "lessons": []
+      },
+      {
+        "id": "fe-state",
+        "title": "State choices",
+        "icon": "◫",
+        "lessons": []
+      },
+      {
+        "id": "fe-testing",
+        "title": "Front-end testing",
+        "icon": "✓",
+        "lessons": []
+      }
+    ]
+  },
+  {
+    "id": "fesd",
+    "title": "Front-end system design",
+    "modules": [
+      {
+        "id": "fesd-basics",
+        "title": "Framework and trade-offs",
+        "icon": "▣",
+        "lessons": []
+      },
+      {
+        "id": "fesd-cases",
+        "title": "Case studies",
+        "icon": "▣",
+        "lessons": []
+      }
+    ]
+  },
+  {
+    "id": "be",
+    "title": "Backend and system design",
+    "modules": [
+      {
+        "id": "sd-estimates",
+        "title": "Estimates",
+        "icon": "≈",
+        "lessons": []
+      },
+      {
+        "id": "node-runtime",
+        "title": "Node runtime",
+        "icon": "⬢",
+        "lessons": []
+      },
+      {
+        "id": "be-apis",
+        "title": "API design",
+        "icon": "⇆",
+        "lessons": []
+      },
+      {
+        "id": "sql",
+        "title": "SQL and query plans",
+        "icon": "⊞",
+        "lessons": []
+      },
+      {
+        "id": "db-model",
+        "title": "Data modeling",
+        "icon": "⊟",
+        "lessons": []
+      },
+      {
+        "id": "db-tx",
+        "title": "Transactions and isolation",
+        "icon": "⊠",
+        "lessons": []
+      },
+      {
+        "id": "db-scale",
+        "title": "Replication and partitioning",
+        "icon": "⊡",
+        "lessons": []
+      },
+      {
+        "id": "be-caching",
+        "title": "Caching",
+        "icon": "⧖",
+        "lessons": []
+      },
+      {
+        "id": "be-queues",
+        "title": "Queues and events",
+        "icon": "⇶",
+        "lessons": []
+      },
+      {
+        "id": "be-consistency",
+        "title": "Consistency and consensus",
+        "icon": "≋",
+        "lessons": []
+      },
+      {
+        "id": "be-reliability",
+        "title": "Reliability",
+        "icon": "⛑",
+        "lessons": []
+      },
+      {
+        "id": "be-perf",
+        "title": "Backend performance",
+        "icon": "◷",
+        "lessons": []
+      },
+      {
+        "id": "be-auth",
+        "title": "Authentication and authorization",
+        "icon": "⚿",
+        "lessons": []
+      },
+      {
+        "id": "be-observability",
+        "title": "Observability",
+        "icon": "◉",
+        "lessons": []
+      },
+      {
+        "id": "be-testing",
+        "title": "Testing strategy",
+        "icon": "✓",
+        "lessons": []
+      },
+      {
+        "id": "be-delivery",
+        "title": "Infra and delivery",
+        "icon": "⇪",
+        "lessons": []
+      },
+      {
+        "id": "be-architecture",
+        "title": "Architecture",
+        "icon": "⌂",
+        "lessons": []
+      },
+      {
+        "id": "sd-cases",
+        "title": "System design case studies",
+        "icon": "▣",
+        "lessons": []
+      }
+    ]
+  },
+  {
+    "id": "dsa",
+    "title": "DSA patterns",
+    "modules": [
+      {
+        "id": "dsa-basics",
+        "title": "Big-O and hashing",
+        "icon": "O",
+        "lessons": []
+      },
+      {
+        "id": "dsa-pointers",
+        "title": "Two pointers and sliding window",
+        "icon": "↔",
+        "lessons": []
+      },
+      {
+        "id": "dsa-stack",
+        "title": "Stacks and monotonic stack",
+        "icon": "≣",
+        "lessons": []
+      },
+      {
+        "id": "dsa-search",
+        "title": "Binary search",
+        "icon": "⌕",
+        "lessons": []
+      },
+      {
+        "id": "dsa-trees",
+        "title": "Trees",
+        "icon": "⋔",
+        "lessons": []
+      },
+      {
+        "id": "dsa-heap",
+        "title": "Heaps and top-k",
+        "icon": "△",
+        "lessons": []
+      },
+      {
+        "id": "dsa-graphs",
+        "title": "Graphs",
+        "icon": "⋈",
+        "lessons": []
+      },
+      {
+        "id": "dsa-backtracking",
+        "title": "Backtracking",
+        "icon": "↶",
+        "lessons": []
+      },
+      {
+        "id": "dsa-dp",
+        "title": "Dynamic programming",
+        "icon": "▦",
+        "lessons": []
+      },
+      {
+        "id": "dsa-greedy",
+        "title": "Greedy and intervals",
+        "icon": "⊏",
+        "lessons": []
+      },
+      {
+        "id": "dsa-misc",
+        "title": "Tries and bits",
+        "icon": "⌥",
+        "lessons": []
+      }
+    ]
+  },
+  {
+    "id": "ai",
+    "title": "AI engineering",
+    "modules": [
+      {
+        "id": "ai-llm",
+        "title": "How LLMs behave",
+        "icon": "◌",
+        "lessons": []
+      },
+      {
+        "id": "ai-prompting",
+        "title": "Prompting",
+        "icon": "›",
+        "lessons": []
+      },
+      {
+        "id": "ai-agents",
+        "title": "Tools and agents",
+        "icon": "⚙",
+        "lessons": []
+      },
+      {
+        "id": "ai-rag",
+        "title": "RAG",
+        "icon": "⌕",
+        "lessons": []
+      },
+      {
+        "id": "ai-evals",
+        "title": "Evals",
+        "icon": "✓",
+        "lessons": []
+      },
+      {
+        "id": "ai-production",
+        "title": "LLMs in production",
+        "icon": "⛨",
+        "lessons": []
+      },
+      {
+        "id": "ai-coding",
+        "title": "AI-assisted coding",
+        "icon": "⌨",
+        "lessons": []
+      },
+      {
+        "id": "ai-ui",
+        "title": "UI for AI",
+        "icon": "▭",
+        "lessons": []
+      },
+      {
+        "id": "ai-models",
+        "title": "Choosing models",
+        "icon": "⚖",
+        "lessons": []
+      }
+    ]
+  },
+  {
+    "id": "go",
+    "title": "Go",
+    "modules": [
+      {
+        "id": "go-types",
+        "title": "Types, interfaces, errors",
+        "icon": "Go",
+        "lessons": []
+      },
+      {
+        "id": "go-concurrency",
+        "title": "Goroutines, channels, context",
+        "icon": "Go",
+        "lessons": []
+      },
+      {
+        "id": "go-memory",
+        "title": "Slices, maps, memory model",
+        "icon": "Go",
+        "lessons": []
+      },
+      {
+        "id": "go-services",
+        "title": "Services and testing",
+        "icon": "Go",
+        "lessons": []
+      }
+    ]
+  },
+  {
+    "id": "rails",
+    "title": "Ruby and Rails",
+    "modules": [
+      {
+        "id": "rb-ruby",
+        "title": "Ruby for Rails",
+        "icon": "Rb",
+        "lessons": []
+      },
+      {
+        "id": "rails-ar",
+        "title": "ActiveRecord",
+        "icon": "Rb",
+        "lessons": []
+      },
+      {
+        "id": "rails-jobs",
+        "title": "Jobs, caching, Hotwire",
+        "icon": "Rb",
+        "lessons": []
+      },
+      {
+        "id": "rails-ops",
+        "title": "Migrations, security, testing",
+        "icon": "Rb",
+        "lessons": []
+      }
+    ]
+  },
+  {
+    "id": "lead",
+    "title": "Principal and product engineering",
+    "modules": [
+      {
+        "id": "lead-scope",
+        "title": "Staff and principal scope",
+        "icon": "↗",
+        "lessons": []
+      },
+      {
+        "id": "lead-docs",
+        "title": "Design docs and RFCs",
+        "icon": "✎",
+        "lessons": []
+      },
+      {
+        "id": "lead-strategy",
+        "title": "Strategy, debt, build vs buy",
+        "icon": "♟",
+        "lessons": []
+      },
+      {
+        "id": "lead-migrations",
+        "title": "Large migrations",
+        "icon": "⇢",
+        "lessons": []
+      },
+      {
+        "id": "lead-incidents",
+        "title": "Incidents and SLOs",
+        "icon": "⚑",
+        "lessons": []
+      },
+      {
+        "id": "lead-product",
+        "title": "Product sense",
+        "icon": "◈",
+        "lessons": []
+      },
+      {
+        "id": "lead-alignment",
+        "title": "Alignment across teams",
+        "icon": "⇋",
+        "lessons": []
+      },
+      {
+        "id": "lead-people",
+        "title": "Mentoring, reviews, hiring",
+        "icon": "☺",
+        "lessons": []
+      }
+    ]
+  },
+  {
+    "id": "behavioral",
+    "title": "Behavioral",
+    "modules": [
+      {
+        "id": "bh-star",
+        "title": "STAR and level signals",
+        "icon": "★",
+        "lessons": []
+      },
+      {
+        "id": "bh-stories",
+        "title": "Your stories",
+        "icon": "❝",
+        "lessons": []
+      }
+    ]
+  }
+]

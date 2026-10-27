@@ -1,0 +1,166 @@
+{
+  "html-event-loops": {
+    "title": "HTML Standard (Web application APIs: event loops)",
+    "publisher": "WHATWG HTML",
+    "type": "spec",
+    "url": "https://html.spec.whatwg.org/multipage/webappapis.html"
+  },
+  "html-timers": {
+    "title": "HTML Standard (Timers)",
+    "publisher": "WHATWG HTML",
+    "type": "spec",
+    "url": "https://html.spec.whatwg.org/multipage/timers-and-user-prompts.html"
+  },
+  "ecma-control-abstraction": {
+    "title": "ECMAScript® 2027 Language Specification (Control Abstraction Objects)",
+    "publisher": "ECMAScript spec",
+    "type": "spec",
+    "url": "https://tc39.es/ecma262/multipage/control-abstraction-objects.html"
+  },
+  "mdn-execution-model": {
+    "title": "JavaScript execution model",
+    "publisher": "MDN",
+    "type": "docs",
+    "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Execution_model"
+  },
+  "mdn-settimeout": {
+    "title": "Window: setTimeout() method",
+    "publisher": "MDN",
+    "type": "docs",
+    "url": "https://developer.mozilla.org/en-US/docs/Web/API/Window/setTimeout"
+  },
+  "mdn-microtask-guide": {
+    "title": "Using microtasks in JavaScript with queueMicrotask()",
+    "publisher": "MDN",
+    "type": "docs",
+    "url": "https://developer.mozilla.org/en-US/docs/Web/API/HTML_DOM_API/Microtask_guide"
+  },
+  "mdn-queuemicrotask": {
+    "title": "Window: queueMicrotask() method",
+    "publisher": "MDN",
+    "type": "docs",
+    "url": "https://developer.mozilla.org/en-US/docs/Web/API/Window/queueMicrotask"
+  },
+  "mdn-await": {
+    "title": "await",
+    "publisher": "MDN",
+    "type": "docs",
+    "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/await"
+  },
+  "mdn-async-function": {
+    "title": "async function",
+    "publisher": "MDN",
+    "type": "docs",
+    "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/async_function"
+  },
+  "mdn-promise": {
+    "title": "Promise",
+    "publisher": "MDN",
+    "type": "docs",
+    "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise"
+  },
+  "mdn-using-promises": {
+    "title": "Using promises",
+    "publisher": "MDN",
+    "type": "docs",
+    "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Using_promises"
+  },
+  "mdn-requestanimationframe": {
+    "title": "Window: requestAnimationFrame() method",
+    "publisher": "MDN",
+    "type": "docs",
+    "url": "https://developer.mozilla.org/en-US/docs/Web/API/Window/requestAnimationFrame"
+  },
+  "mdn-scheduler-yield": {
+    "title": "Scheduler: yield() method",
+    "publisher": "MDN",
+    "type": "docs",
+    "url": "https://developer.mozilla.org/en-US/docs/Web/API/Scheduler/yield"
+  },
+  "mdn-prioritized-task-scheduling": {
+    "title": "Prioritized Task Scheduling API",
+    "publisher": "MDN",
+    "type": "docs",
+    "url": "https://developer.mozilla.org/en-US/docs/Web/API/Prioritized_Task_Scheduling_API"
+  },
+  "jakearchibald-tasks-microtasks": {
+    "title": "Tasks, microtasks, queues and schedules",
+    "publisher": "Jake Archibald",
+    "type": "article",
+    "url": "https://jakearchibald.com/2015/tasks-microtasks-queues-and-schedules/",
+    "year": 2015
+  },
+  "v8-fast-async": {
+    "title": "Faster async functions and promises",
+    "publisher": "V8 blog",
+    "type": "article",
+    "url": "https://v8.dev/blog/fast-async",
+    "year": 2018
+  },
+  "webdev-optimize-long-tasks": {
+    "title": "Optimize long tasks",
+    "publisher": "web.dev",
+    "type": "article",
+    "url": "https://web.dev/articles/optimize-long-tasks"
+  },
+  "webdev-inp": {
+    "title": "Interaction to Next Paint (INP)",
+    "publisher": "web.dev",
+    "type": "article",
+    "url": "https://web.dev/articles/inp"
+  },
+  "node-event-loop": {
+    "title": "The Node.js Event Loop",
+    "publisher": "Node.js docs",
+    "type": "docs",
+    "url": "https://nodejs.org/en/learn/asynchronous-work/event-loop-timers-and-nexttick"
+  },
+  "node-understanding-nexttick": {
+    "title": "Understanding process.nextTick()",
+    "publisher": "Node.js docs",
+    "type": "docs",
+    "url": "https://nodejs.org/en/learn/asynchronous-work/understanding-processnexttick"
+  },
+  "node-process": {
+    "title": "Process | Node.js Documentation",
+    "publisher": "Node.js docs",
+    "type": "docs",
+    "url": "https://nodejs.org/api/process.html"
+  },
+  "node-timers": {
+    "title": "Timers | Node.js Documentation",
+    "publisher": "Node.js docs",
+    "type": "docs",
+    "url": "https://nodejs.org/api/timers.html"
+  },
+  "node-cli": {
+    "title": "Command-line API | Node.js Documentation",
+    "publisher": "Node.js docs",
+    "type": "docs",
+    "url": "https://nodejs.org/api/cli.html"
+  },
+  "mdn-unhandledrejection": {
+    "title": "Window: unhandledrejection event",
+    "publisher": "MDN",
+    "type": "docs",
+    "url": "https://developer.mozilla.org/en-US/docs/Web/API/Window/unhandledrejection_event"
+  },
+  "node-events": {
+    "title": "Events | Node.js Documentation",
+    "publisher": "Node.js docs",
+    "type": "docs",
+    "url": "https://nodejs.org/api/events.html"
+  },
+  "html-animation-frames": {
+    "title": "HTML Standard (Animation frames)",
+    "publisher": "WHATWG HTML",
+    "type": "spec",
+    "url": "https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html"
+  },
+  "mdn-promise-constructor": {
+    "title": "Promise() constructor",
+    "publisher": "MDN",
+    "type": "docs",
+    "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/Promise"
+  }
+}

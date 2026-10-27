@@ -1,0 +1,572 @@
+{
+  "id": "el-microtasks",
+  "module": "js-event-loop",
+  "title": "Microtasks and the checkpoint",
+  "goal": "Predict when promise callbacks and queueMicrotask run relative to tasks, listeners and each other.",
+  "pretest": [
+    "m-order-basic",
+    "m-click-vs-click"
+  ],
+  "requires": [
+    "el-tasks"
+  ],
+  "lastReviewed": "2026-10-27",
+  "steps": [
+    {
+      "type": "concept",
+      "id": "c-checkpoint",
+      "title": "The microtask checkpoint",
+      "text": "Promise reactions, `queueMicrotask` callbacks and MutationObserver callbacks share one FIFO microtask queue [[c:microtask-kinds]], apart from the task queues. The loop drains it at a [microtask checkpoint](g:microtask-checkpoint): right after every task [[c:checkpoint-after-task]], and also whenever a callback returns and the JavaScript stack is now empty [[c:checkpoint-after-callback]].\n\nDraining means until empty, including microtasks queued while draining [[c:drain-until-empty]]. So a microtask queued inside a timer callback runs before the next timer callback, even if both timers were already due. Browsers and current Node agree on this.",
+      "claims": [
+        {
+          "id": "microtask-kinds",
+          "text": "Promise and MutationObserver callbacks use the microtask queue.",
+          "sources": [
+            "mdn-microtask-guide"
+          ],
+          "evidence": [
+            {
+              "source": "mdn-microtask-guide",
+              "quote": "JavaScript promises and the Mutation Observer API both use the microtask queue to run their callbacks, but there are other times when the ability to defer work until the current event loop pass is wrapping up is helpful."
+            }
+          ]
+        },
+        {
+          "id": "checkpoint-after-task",
+          "text": "The event loop performs a microtask checkpoint after each task.",
+          "sources": [
+            "html-event-loops"
+          ],
+          "evidence": [
+            {
+              "source": "html-event-loops",
+              "quote": "Set the event loop's currently running task back to null. Perform a microtask checkpoint."
+            }
+          ]
+        },
+        {
+          "id": "checkpoint-after-callback",
+          "text": "When a callback returns and the stack is empty, microtasks run.",
+          "sources": [
+            "html-event-loops"
+          ],
+          "evidence": [
+            {
+              "source": "html-event-loops",
+              "quote": "If the JavaScript execution context stack is now empty, perform a microtask checkpoint."
+            }
+          ]
+        },
+        {
+          "id": "drain-until-empty",
+          "text": "Microtasks added while draining run before the next task.",
+          "sources": [
+            "mdn-microtask-guide"
+          ],
+          "evidence": [
+            {
+              "source": "mdn-microtask-guide",
+              "quote": "If a microtask adds more microtasks to the queue by calling queueMicrotask(), those newly-added microtasks execute before the next task is run."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "question",
+      "item": "m-nested-in-timer"
+    },
+    {
+      "type": "question",
+      "item": "m-order-basic",
+      "variant": "v2"
+    },
+    {
+      "type": "concept",
+      "id": "c-reactions",
+      "title": "When a reaction is queued",
+      "text": "`.then` on a settled promise queues its reaction at once. On a pending promise it only registers it; the job is queued when the promise settles [[c:reaction-on-settle]]. Order follows queueing time, not the line where `.then` was written.\n\nEach `.then` returns a new promise, settled only when its handler has run, so a chain moves one hop per microtask and two chains interleave:\n```js\nconst a = Promise.resolve();\na.then(() => log('a1')).then(() => log('a2'));\na.then(() => log('b1')).then(() => log('b2'));\n// a1 b1 a2 b2\n```\n`queueMicrotask(fn)` joins the same queue with no promise around it. One difference: an error thrown in it is reported as a normal exception, not as a rejected promise [[c:queuemicrotask-errors]].",
+      "claims": [
+        {
+          "id": "reaction-on-settle",
+          "text": "A promise queues its reaction microtask when it settles, or at once if already settled.",
+          "sources": [
+            "jakearchibald-tasks-microtasks"
+          ],
+          "evidence": [
+            {
+              "source": "jakearchibald-tasks-microtasks",
+              "quote": "Once a promise settles, or if it has already settled, it queues a microtask for its reactionary callbacks."
+            }
+          ]
+        },
+        {
+          "id": "queuemicrotask-errors",
+          "text": "Errors from promise-based microtasks become rejections; queueMicrotask reports them as exceptions.",
+          "sources": [
+            "mdn-microtask-guide"
+          ],
+          "evidence": [
+            {
+              "source": "mdn-microtask-guide",
+              "quote": "For instance, when using promises to create microtasks, exceptions thrown by the callback are reported as rejected promises rather than being reported as standard exceptions."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "question",
+      "item": "m-then-pending"
+    },
+    {
+      "type": "question",
+      "item": "m-pick-microtask"
+    },
+    {
+      "type": "concept",
+      "id": "c-starvation",
+      "title": "Microtask starvation",
+      "text": "Because the checkpoint drains until empty, a microtask that keeps queueing microtasks never lets the loop reach the next task: no timer, no I/O callback, no input, no paint [[c:microtask-starvation]].\n\nUnlike `while (true)`, it looks async, so it passes review. Typical forms: a recursive `queueMicrotask`, a `then` chain that schedules itself again, or a poll such as `while (!ready) await null` waiting for a flag that a timer or an event sets. That last one is a hang, not a slow loop: whatever sets the flag is a task, and tasks never get a turn.",
+      "claims": [
+        {
+          "id": "microtask-starvation",
+          "text": "Recursively queued microtasks can keep the event loop busy forever.",
+          "sources": [
+            "mdn-microtask-guide"
+          ],
+          "evidence": [
+            {
+              "source": "mdn-microtask-guide",
+              "quote": "Since microtasks can themselves enqueue more microtasks, and the event loop continues processing microtasks until the queue is empty, there's a real risk of getting the event loop endlessly processing microtasks."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "question",
+      "item": "m-starvation"
+    },
+    {
+      "type": "concept",
+      "id": "c-click",
+      "title": "User click vs element.click()",
+      "text": "The checkpoint after a callback runs only if the stack is empty. For a real click, the browser calls each listener from native code, so the stack is empty after each one and its microtasks run before the next listener [[c:checkpoint-mid-dispatch]].\n\n`btn.click()` or `dispatchEvent` from script dispatches synchronously: the calling script is still on the stack between listeners, so every microtask waits until that script ends [[c:click-synchronous]]. Same listeners, different order. A test that calls `.click()` does not reproduce what a user's click does. Node's `EventTarget.dispatchEvent` is synchronous too.",
+      "claims": [
+        {
+          "id": "checkpoint-mid-dispatch",
+          "text": "Microtasks run after callbacks when no other JavaScript is mid-execution.",
+          "sources": [
+            "jakearchibald-tasks-microtasks"
+          ],
+          "evidence": [
+            {
+              "source": "jakearchibald-tasks-microtasks",
+              "quote": "The microtask queue is processed after callbacks as long as no other JavaScript is mid-execution, and at the end of each task."
+            }
+          ]
+        },
+        {
+          "id": "click-synchronous",
+          "text": "element.click() dispatches synchronously, so microtasks don't run between listeners.",
+          "sources": [
+            "jakearchibald-tasks-microtasks"
+          ],
+          "evidence": [
+            {
+              "source": "jakearchibald-tasks-microtasks",
+              "quote": "Previously, this meant that microtasks ran between listener callbacks, but .click() causes the event to dispatch synchronously, so the script that calls .click() is still in the stack between callbacks."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "question",
+      "item": "m-click-vs-click",
+      "variant": "v2"
+    },
+    {
+      "type": "question",
+      "item": "m-click-vs-click",
+      "variant": "v3"
+    },
+    {
+      "type": "recap",
+      "points": [
+        "Microtasks (promise jobs, queueMicrotask, MutationObserver) share one FIFO queue, drained until empty.",
+        "Checkpoints run after every task and after any callback that leaves the stack empty, so microtasks run between timer callbacks.",
+        "A reaction is queued when its promise settles (or at .then if already settled); each chain hop is one more microtask.",
+        "Microtasks that keep queueing microtasks starve timers, I/O, input and paint; `while (!x) await null` hangs.",
+        "A real click runs microtasks between listeners; btn.click() and dispatchEvent from script do not."
+      ]
+    }
+  ],
+  "items": [
+    {
+      "id": "m-order-basic",
+      "concept": "c-checkpoint",
+      "bloom": "apply",
+      "recallFirst": true,
+      "sources": [
+        "mdn-microtask-guide",
+        "jakearchibald-tasks-microtasks"
+      ],
+      "variants": [
+        {
+          "id": "v1",
+          "stem": "What does this log?\n```js\nconst log = console.log;\nsetTimeout(() => log('t'));\nPromise.resolve().then(() => log('p1'))\n  .then(() => log('p2'));\nqueueMicrotask(() => log('q'));\nlog('s');\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`s p1 q p2 t`",
+              "correct": true,
+              "why": "`p1` and `q` are queued during the script. `p2` is queued only when `p1` runs, so it goes behind `q`. The timer task comes after the queue is empty."
+            },
+            {
+              "id": "b",
+              "text": "`s p1 p2 q t`",
+              "why": "A `then` chain does not run to the end in one go. Each hop is a new microtask, queued when the previous handler finishes."
+            },
+            {
+              "id": "c",
+              "text": "`s q p1 p2 t`",
+              "why": "`queueMicrotask` has no priority over promise jobs. Both use one FIFO queue, and `p1` was queued first."
+            }
+          ],
+          "runs": true
+        },
+        {
+          "id": "v2",
+          "stem": "What does this log?\n```js\nconst log = console.log;\nsetTimeout(() => log('t'));\nqueueMicrotask(() => {\n  log('m1');\n  queueMicrotask(() => log('m3'));\n});\nqueueMicrotask(() => log('m2'));\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`m1 m2 m3 t`",
+              "correct": true,
+              "why": "`m3` joins the end of the queue, behind `m2`. The queue is drained until empty before the timer task runs."
+            },
+            {
+              "id": "b",
+              "text": "`m1 m3 m2 t`",
+              "why": "A nested microtask is not run at once. It is added to the end of the queue, behind `m2`."
+            },
+            {
+              "id": "c",
+              "text": "`m1 m2 t m3`",
+              "why": "Microtasks added during draining still run in this checkpoint. The timer waits until the queue is empty."
+            }
+          ],
+          "runs": true
+        }
+      ]
+    },
+    {
+      "id": "m-then-pending",
+      "concept": "c-reactions",
+      "bloom": "apply",
+      "recallFirst": true,
+      "sources": [
+        "jakearchibald-tasks-microtasks"
+      ],
+      "variants": [
+        {
+          "id": "v1",
+          "stem": "What does this log?\n```js\nconst log = console.log;\nlet res;\nconst p = new Promise((r) => (res = r));\np.then(() => log('p'));\nPromise.resolve().then(() => log('a'))\n  .then(() => log('b'));\nres();\nlog('s');\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`s a p b`",
+              "correct": true,
+              "why": "`p.then` only registers while `p` is pending. Its job is queued by `res()`, after `a` was queued. `b` is queued when `a` runs."
+            },
+            {
+              "id": "b",
+              "text": "`s p a b`",
+              "why": "Order follows when jobs are queued, not where `.then` is written. `p` was still pending, so its job came after `a`."
+            },
+            {
+              "id": "c",
+              "text": "`s a b p`",
+              "why": "`b` is queued only when `a` runs. By then `p`'s job, queued by `res()` during the script, is already ahead of it."
+            }
+          ],
+          "runs": true
+        },
+        {
+          "id": "v2",
+          "stem": "What does this log?\n```js\nconst log = console.log;\nconst p = new Promise((r) => {\n  log('e');\n  r();\n});\nqueueMicrotask(() => log('q'));\np.then(() => log('p'));\nlog('s');\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`e s q p`",
+              "correct": true,
+              "why": "The executor runs at once and settles `p`, but no job exists until `.then` is called. That happens after `queueMicrotask`."
+            },
+            {
+              "id": "b",
+              "text": "`e s p q`",
+              "why": "Settling first does not queue anything. The reaction job is queued when `.then` is called on the settled promise, after `q`."
+            },
+            {
+              "id": "c",
+              "text": "`s e q p`",
+              "why": "The executor runs synchronously, inside the `new Promise` call, before the next line."
+            }
+          ],
+          "runs": true
+        }
+      ]
+    },
+    {
+      "id": "m-nested-in-timer",
+      "concept": "c-checkpoint",
+      "bloom": "apply",
+      "recallFirst": true,
+      "sources": [
+        "html-event-loops",
+        "mdn-microtask-guide"
+      ],
+      "variants": [
+        {
+          "id": "v1",
+          "stem": "What does this log?\n```js\nconst log = console.log;\nsetTimeout(() => {\n  log('t1');\n  Promise.resolve().then(() => log('p'));\n});\nsetTimeout(() => log('t2'));\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`t1 p t2`",
+              "correct": true,
+              "why": "Each timer callback is its own task, and a checkpoint runs after it. `p` runs before the second timer, even though both timers were due."
+            },
+            {
+              "id": "b",
+              "text": "`t1 t2 p`",
+              "why": "This assumes due timers run as one batch. Each timer callback is its own task with a checkpoint after it, in Node as in browsers."
+            },
+            {
+              "id": "c",
+              "text": "`p t1 t2`",
+              "why": "`p` does not exist until the first timer callback runs and creates it."
+            }
+          ],
+          "runs": true
+        },
+        {
+          "id": "v2",
+          "stem": "What does this log?\n```js\nconst log = console.log;\nsetTimeout(() => log('t1'));\nsetTimeout(() => {\n  log('t2');\n  queueMicrotask(() => log('m'));\n});\nsetTimeout(() => log('t3'));\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`t1 t2 m t3`",
+              "correct": true,
+              "why": "The checkpoint after the `t2` callback runs `m` before the `t3` task starts."
+            },
+            {
+              "id": "b",
+              "text": "`t1 t2 t3 m`",
+              "why": "Due timers are not run as one batch. Each callback is followed by a microtask checkpoint."
+            },
+            {
+              "id": "c",
+              "text": "`m t1 t2 t3`",
+              "why": "`m` is queued only when the `t2` callback runs."
+            }
+          ],
+          "runs": true
+        }
+      ]
+    },
+    {
+      "id": "m-pick-microtask",
+      "concept": "c-reactions",
+      "bloom": "evaluate",
+      "recallFirst": true,
+      "sources": [
+        "mdn-microtask-guide",
+        "jakearchibald-tasks-microtasks"
+      ],
+      "variants": [
+        {
+          "id": "v1",
+          "stem": "A store gets several `set()` calls in one handler and should notify subscribers once, after the current code, before the browser can paint and before any other task. What should `set()` use to schedule the flush (once)?",
+          "options": [
+            {
+              "id": "a",
+              "text": "`queueMicrotask(flush)`",
+              "correct": true,
+              "why": "A microtask runs as soon as the current script's stack empties, before rendering and before any other task. All `set()` calls of the handler land before it."
+            },
+            {
+              "id": "b",
+              "text": "`setTimeout(flush, 0)`",
+              "why": "A timer is a new task. Other tasks and a paint can come first, so the UI can show a frame before the flush."
+            },
+            {
+              "id": "c",
+              "text": "`requestAnimationFrame(flush)`",
+              "why": "It runs before the next paint, but other tasks can run first, and it waits for a frame, up to about 16 ms."
+            }
+          ]
+        },
+        {
+          "id": "v2",
+          "stem": "A small event library wants `emit()` to call listeners after the caller's code finishes but before any timer or I/O callback. It also wants a throwing listener to surface as a normal uncaught error. What fits best?",
+          "options": [
+            {
+              "id": "a",
+              "text": "`queueMicrotask(() => fn(data))` per listener",
+              "correct": true,
+              "why": "It runs before any other task, and an error thrown in it is reported as a normal exception, not as a rejected promise."
+            },
+            {
+              "id": "b",
+              "text": "`Promise.resolve().then(() => fn(data))`",
+              "why": "The timing is the same, but an error becomes a rejected promise, reported as an unhandled rejection, not a normal exception."
+            },
+            {
+              "id": "c",
+              "text": "`setTimeout(() => fn(data), 0)`",
+              "why": "A timer is a task. Other timers and I/O callbacks that are already due can run first."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "m-starvation",
+      "concept": "c-starvation",
+      "bloom": "analyse",
+      "recallFirst": true,
+      "sources": [
+        "mdn-microtask-guide"
+      ],
+      "variants": [
+        {
+          "id": "v1",
+          "stem": "What does this log?\n```js\nconst log = console.log;\nlet n = 0;\nsetTimeout(() => log('timer'));\nfunction spin() {\n  log('m' + n);\n  if (++n < 3) queueMicrotask(spin);\n}\nqueueMicrotask(spin);\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`m0 m1 m2 timer`",
+              "correct": true,
+              "why": "The checkpoint drains every microtask, including ones queued while draining. The timer task waits until the queue is empty, however long that takes."
+            },
+            {
+              "id": "b",
+              "text": "`m0 timer m1 m2`",
+              "why": "The timer does not get a turn between microtasks. Tasks run only when the microtask queue is empty."
+            },
+            {
+              "id": "c",
+              "text": "`m0 m1 timer m2`",
+              "why": "There is no limit on how many microtasks one checkpoint runs. With 3 or 3 million, the timer still waits for all of them."
+            }
+          ],
+          "runs": true
+        },
+        {
+          "id": "v2",
+          "stem": "This waits for a flag that a `setTimeout` callback sets 100 ms later. What happens?\n```js\nasync function waitReady() {\n  while (!ready) await null;\n  start();\n}\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "It hangs forever: the timer that sets `ready` never runs",
+              "correct": true,
+              "why": "Each `await null` resumes in a microtask, so the queue never empties and the timer task never gets a turn."
+            },
+            {
+              "id": "b",
+              "text": "It works, but uses a lot of CPU for 100 ms",
+              "why": "That would need the timer to run between iterations. Tasks only run when the microtask queue is empty, and this loop keeps it full."
+            },
+            {
+              "id": "c",
+              "text": "It works: `await` yields to the event loop each time",
+              "why": "`await` yields only to the microtask queue, not to tasks. Waiting for a task needs a promise that the task itself resolves."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "m-click-vs-click",
+      "concept": "c-click",
+      "bloom": "analyse",
+      "recallFirst": true,
+      "sources": [
+        "jakearchibald-tasks-microtasks",
+        "html-event-loops"
+      ],
+      "variants": [
+        {
+          "id": "v1",
+          "stem": "In a browser, the user clicks `btn`. What is logged?\n```js\nconst log = console.log;\nbtn.addEventListener('click', () => {\n  Promise.resolve().then(() => log('p1'));\n  log('L1');\n});\nbtn.addEventListener('click', () => {\n  Promise.resolve().then(() => log('p2'));\n  log('L2');\n});\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`L1 p1 L2 p2`",
+              "correct": true,
+              "why": "The browser calls each listener from native code. When `L1`'s listener returns the stack is empty, so a checkpoint runs `p1` before the second listener."
+            },
+            {
+              "id": "b",
+              "text": "`L1 L2 p1 p2`",
+              "why": "That is the order for `btn.click()` from script. For a real click the stack empties between listeners, so microtasks run there."
+            },
+            {
+              "id": "c",
+              "text": "`L1 L2 p2 p1`",
+              "why": "Microtasks run in FIFO order. `p1` was queued first, so it never runs after `p2`."
+            }
+          ]
+        },
+        {
+          "id": "v2",
+          "stem": "In a browser, a script runs this. What is logged?\n```js\nconst log = console.log;\nbtn.addEventListener('click', () => {\n  Promise.resolve().then(() => log('p1'));\n  log('L1');\n});\nbtn.addEventListener('click', () => {\n  Promise.resolve().then(() => log('p2'));\n  log('L2');\n});\nbtn.click();\nlog('after');\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`L1 L2 after p1 p2`",
+              "correct": true,
+              "why": "`click()` dispatches synchronously, so the calling script is on the stack between listeners. Microtasks wait until the whole script ends."
+            },
+            {
+              "id": "b",
+              "text": "`L1 p1 L2 p2 after`",
+              "why": "That is the order for a real user click. Here the script that called `click()` is still running, so no checkpoint happens between listeners."
+            },
+            {
+              "id": "c",
+              "text": "`L1 L2 p1 p2 after`",
+              "why": "`click()` returns before any microtask runs. `after` is logged while the script is still on the stack."
+            }
+          ]
+        },
+        {
+          "id": "v3",
+          "stem": "In Node, what does this log?\n```js\nconst log = console.log;\nconst t = new EventTarget();\nt.addEventListener('go', () => {\n  Promise.resolve().then(() => log('p1'));\n  log('L1');\n});\nt.addEventListener('go', () => {\n  Promise.resolve().then(() => log('p2'));\n  log('L2');\n});\nt.dispatchEvent(new Event('go'));\nlog('after');\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`L1 L2 after p1 p2`",
+              "correct": true,
+              "why": "`dispatchEvent` from script is synchronous, like `click()`. The calling script stays on the stack, so microtasks run after it ends."
+            },
+            {
+              "id": "b",
+              "text": "`L1 p1 L2 p2 after`",
+              "why": "Microtasks between listeners need an empty stack, as with a real user click. Here the script that dispatched is still running."
+            },
+            {
+              "id": "c",
+              "text": "`after L1 L2 p1 p2`",
+              "why": "`dispatchEvent` calls the listeners before it returns, so `after` comes after both."
+            }
+          ],
+          "runs": true
+        }
+      ]
+    }
+  ]
+}

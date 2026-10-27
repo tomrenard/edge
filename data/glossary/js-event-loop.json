@@ -1,0 +1,17 @@
+{
+  "microtask-checkpoint": {
+    "term": "microtask checkpoint",
+    "short": "The HTML spec step that runs the microtask queue until it is empty. It runs after each task and whenever the JavaScript stack becomes empty after a callback.",
+    "lesson": "el-microtasks"
+  },
+  "rendering-opportunity": {
+    "term": "rendering opportunity",
+    "short": "A moment when the browser can present a new frame, set by the display refresh rate and throttling. Only then does 'update the rendering' run: rAF callbacks, style, layout, paint.",
+    "lesson": "el-rendering"
+  },
+  "thenable": {
+    "term": "thenable",
+    "short": "Any object with a then method. Promise machinery adopts its state by calling then in a separate job, which costs extra microtask ticks compared with a native promise.",
+    "lesson": "el-async-await"
+  }
+}

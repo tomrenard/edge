@@ -1,0 +1,572 @@
+{
+  "id": "el-tasks",
+  "module": "js-event-loop",
+  "title": "Tasks and run to completion",
+  "goal": "Explain why a task can't be interrupted, when a timer really fires, and why a long task freezes the page.",
+  "pretest": [
+    "t-timer-deadline",
+    "t-long-task-paint"
+  ],
+  "requires": [],
+  "lastReviewed": "2026-10-27",
+  "steps": [
+    {
+      "type": "concept",
+      "id": "c-run-to-completion",
+      "title": "Run to completion",
+      "text": "One thread, one call stack. The event loop takes one task (a script, a timer callback, an event dispatch, an I/O callback), runs it until the stack is empty, then picks the next. A running task is never preempted [[c:run-to-completion]]: an expired timer, a network message or a click only queues another task.\n\nSo a synchronous block sees no outside change half way through, even if it runs for seconds. Shared state can only change between tasks (or at an `await`, which ends the current slice of work). The price is the same rule seen from the other side: while one task runs, nothing else on that thread runs, not input handling and not painting [[c:long-job-blocks]].",
+      "claims": [
+        {
+          "id": "run-to-completion",
+          "text": "A job runs to the end before any other job; it cannot be preempted.",
+          "sources": [
+            "mdn-execution-model"
+          ],
+          "evidence": [
+            {
+              "source": "mdn-execution-model",
+              "quote": "Each job is processed completely before any other job is processed. This offers some nice properties when reasoning about your program, including the fact that whenever a function runs, it cannot be preempted and will run entirely before any other code runs (and can modify data the function manipulates)."
+            }
+          ]
+        },
+        {
+          "id": "long-job-blocks",
+          "text": "A long job blocks user interaction.",
+          "sources": [
+            "mdn-execution-model"
+          ],
+          "evidence": [
+            {
+              "source": "mdn-execution-model",
+              "quote": "A downside of this model is that if a job takes too long to complete, the web application is unable to process user interactions like click or scroll."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "question",
+      "item": "t-run-to-completion"
+    },
+    {
+      "type": "concept",
+      "id": "c-timers",
+      "title": "setTimeout queues a task, later",
+      "text": "`setTimeout(fn, ms)` does not call `fn` after `ms`. It waits at least `ms`, then queues a task [[c:timeout-queues-task]], which runs after the current task and its microtasks. The delay is a minimum [[c:timeout-minimum]]. In Node, if a 30 ms loop blocks the thread, a 10 ms timer and a later 0 ms timer both fire after it, ordered by deadline, not by call order. The HTML spec only promises that a timer runs after earlier ones with an equal or shorter delay [[c:timer-order]].\n\nBrowsers raise the delay to 4 ms once timers are nested more than 5 deep [[c:nested-clamp]]. Node has no 4 ms rule but turns any delay below 1 into 1 [[c:node-min-1ms]], so `setTimeout(f, 1)` and `setTimeout(g, 0)` share a deadline and run in call order.",
+      "claims": [
+        {
+          "id": "timeout-queues-task",
+          "text": "setTimeout waits, then schedules a new task.",
+          "sources": [
+            "jakearchibald-tasks-microtasks"
+          ],
+          "evidence": [
+            {
+              "source": "jakearchibald-tasks-microtasks",
+              "quote": "setTimeout waits for a given delay then schedules a new task for its callback."
+            }
+          ]
+        },
+        {
+          "id": "timeout-minimum",
+          "text": "A timer can fire later than its delay.",
+          "sources": [
+            "mdn-settimeout"
+          ],
+          "evidence": [
+            {
+              "source": "mdn-settimeout",
+              "quote": "There are a number of reasons why a timeout may take longer to fire than anticipated."
+            }
+          ]
+        },
+        {
+          "id": "nested-clamp",
+          "text": "Browsers clamp nested timers to 4 ms after 5 levels.",
+          "sources": [
+            "html-timers",
+            "mdn-settimeout"
+          ],
+          "evidence": [
+            {
+              "source": "html-timers",
+              "quote": "If nestingLevel is greater than 5, and timeout is less than 4, then set timeout to 4."
+            },
+            {
+              "source": "mdn-settimeout",
+              "quote": "As specified in the HTML standard, browsers will enforce a minimum timeout of 4 milliseconds once a nested call to setTimeout has been scheduled 5 times."
+            }
+          ]
+        },
+        {
+          "id": "node-min-1ms",
+          "text": "Node sets delays below 1 ms to 1 ms.",
+          "sources": [
+            "node-timers"
+          ],
+          "evidence": [
+            {
+              "source": "node-timers",
+              "quote": "When delay is larger than 2147483647 or less than 1 or NaN, the delay will be set to 1."
+            }
+          ]
+        },
+        {
+          "id": "timer-order",
+          "text": "HTML only orders a timer after earlier timers with an equal or shorter delay.",
+          "sources": [
+            "html-timers"
+          ],
+          "evidence": [
+            {
+              "source": "html-timers",
+              "quote": "Wait until any invocations of this algorithm that had the same global and orderingIdentifier, that started before this one, and whose milliseconds is less than or equal to this one's, have completed."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "question",
+      "item": "t-timer-deadline",
+      "variant": "v2"
+    },
+    {
+      "type": "question",
+      "item": "t-node-1ms"
+    },
+    {
+      "type": "question",
+      "item": "t-nested-clamp"
+    },
+    {
+      "type": "concept",
+      "id": "c-events-as-tasks",
+      "title": "An event is one task",
+      "text": "A real user click becomes one task: the browser dispatches the event and calls every listener on the propagation path inside that task [[c:dispatch-is-task]]. A `setTimeout` queued by the first listener is a new task, so it runs after all listeners, not between them.\n\nNode's `EventEmitter.emit` is more direct still: a synchronous loop over the listeners in registration order [[c:emit-sync]], inside whatever task called `emit`. Code after `emit()` runs only when every listener has returned.\n\nEither way, a slow listener delays every listener after it, every queued task, and the next input event.",
+      "claims": [
+        {
+          "id": "dispatch-is-task",
+          "text": "Dispatching a click event is a task.",
+          "sources": [
+            "jakearchibald-tasks-microtasks"
+          ],
+          "evidence": [
+            {
+              "source": "jakearchibald-tasks-microtasks",
+              "quote": "Dispatching the 'click' event is a task."
+            }
+          ]
+        },
+        {
+          "id": "emit-sync",
+          "text": "EventEmitter calls its listeners synchronously, in registration order.",
+          "sources": [
+            "node-events"
+          ],
+          "evidence": [
+            {
+              "source": "node-events",
+              "quote": "The EventEmitter calls all listeners synchronously in the order in which they were registered."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "question",
+      "item": "t-listeners-one-task"
+    },
+    {
+      "type": "concept",
+      "id": "c-long-tasks",
+      "title": "No paint inside a task",
+      "text": "Browsers render between tasks, never in the middle of one [[c:render-between-tasks]]. So \"show spinner, 2 s of synchronous work, hide spinner\" in one handler never shows the spinner: the DOM changes twice, but no frame is produced until the task ends, and by then it is hidden again. The same goes for a progress bar updated in a loop.\n\nweb.dev calls any task over 50 ms a long task [[c:long-task-50ms]]. During it, clicks and key presses wait in the queue. The fix is to split the work over several tasks (the rendering lesson covers how). Making the function `async` without a real yield changes nothing.",
+      "claims": [
+        {
+          "id": "render-between-tasks",
+          "text": "Rendering happens between tasks.",
+          "sources": [
+            "jakearchibald-tasks-microtasks"
+          ],
+          "evidence": [
+            {
+              "source": "jakearchibald-tasks-microtasks",
+              "quote": "Between tasks, the browser may render updates."
+            }
+          ]
+        },
+        {
+          "id": "long-task-50ms",
+          "text": "A task over 50 ms is a long task.",
+          "sources": [
+            "webdev-optimize-long-tasks"
+          ],
+          "evidence": [
+            {
+              "source": "webdev-optimize-long-tasks",
+              "quote": "Any task that takes longer than 50 milliseconds is a long task."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "question",
+      "item": "t-long-task-paint",
+      "variant": "v2"
+    },
+    {
+      "type": "recap",
+      "points": [
+        "A task runs to completion: nothing preempts it, so state cannot change mid-task, and nothing else (input, paint) runs either.",
+        "setTimeout queues a task after at least the delay. Expired timers run by deadline, after the current task.",
+        "Browsers clamp nested timers to 4 ms after 5 levels; Node raises any delay below 1 to 1 ms.",
+        "One user event is one task: all its listeners run before any timer they schedule.",
+        "No paint inside a task: DOM writes in one long task show only the final state. Over 50 ms is a long task."
+      ]
+    }
+  ],
+  "items": [
+    {
+      "id": "t-run-to-completion",
+      "concept": "c-run-to-completion",
+      "bloom": "understand",
+      "recallFirst": true,
+      "sources": [
+        "mdn-execution-model"
+      ],
+      "variants": [
+        {
+          "id": "v1",
+          "stem": "A WebSocket `message` handler pushes into `rows`. A click handler runs a 200 ms synchronous loop that reads `rows.length` at its start and at its end. A message arrives 50 ms into the loop. What can the loop see?",
+          "options": [
+            {
+              "id": "a",
+              "text": "The same length at both reads; the message handler runs after the click task",
+              "correct": true,
+              "why": "The message only queues a task. The click task runs to completion first, so `rows` cannot change under it."
+            },
+            {
+              "id": "b",
+              "text": "A larger length at the end; the handler runs between loop iterations",
+              "why": "JavaScript has no preemption on the main thread. Loop iterations are not yield points; only the end of the task (or an `await`) is."
+            },
+            {
+              "id": "c",
+              "text": "Either result, depending on whether the engine pauses the loop for I/O",
+              "why": "Engines never pause running script to deliver events. I/O completion becomes a task that waits for the stack to empty."
+            }
+          ]
+        },
+        {
+          "id": "v2",
+          "stem": "A Node HTTP handler does `const n = counter; work(); counter = n + 1;` where `work()` is 100 ms of synchronous CPU work. Two requests arrive 10 ms apart. Can an increment be lost?",
+          "options": [
+            {
+              "id": "a",
+              "text": "No: the second handler runs only after the first has written `counter`",
+              "correct": true,
+              "why": "Each request callback is a task that runs to completion. With no `await` between the read and the write, the second handler sees the updated value."
+            },
+            {
+              "id": "b",
+              "text": "Yes: the second handler can run during `work()` and read the old value",
+              "why": "That would need preemption. It becomes possible only if real async work (I/O, a timer) is awaited between the read and the write; awaiting a synchronous `work()` resumes in a microtask, before any other request."
+            },
+            {
+              "id": "c",
+              "text": "Only on multi-core machines, where libuv runs handlers in parallel",
+              "why": "libuv uses threads for some I/O, but all JavaScript callbacks run on the one main thread, one at a time."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "t-timer-deadline",
+      "concept": "c-timers",
+      "bloom": "apply",
+      "recallFirst": true,
+      "sources": [
+        "jakearchibald-tasks-microtasks",
+        "node-timers"
+      ],
+      "variants": [
+        {
+          "id": "v1",
+          "stem": "In Node, what does this log?\n```js\nconst t0 = Date.now();\nsetTimeout(() => console.log('b'), 10);\nsetTimeout(() => console.log('a'), 0);\nwhile (Date.now() - t0 < 30) {}\nconsole.log('sync');\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`sync a b`",
+              "correct": true,
+              "why": "Both timers expire during the 30 ms loop. Timers run after the current task, ordered by deadline: `a` is due at about 1 ms, `b` at 10 ms."
+            },
+            {
+              "id": "b",
+              "text": "`sync b a`",
+              "why": "Call order does not decide the order of timers. Each timer has a deadline, and `a` (0, raised to 1 ms) is due before `b` (10 ms)."
+            },
+            {
+              "id": "c",
+              "text": "`a sync b`",
+              "why": "A 0 ms timer cannot interrupt the running script. It is only queued, and runs after the synchronous code ends."
+            }
+          ],
+          "runs": true
+        },
+        {
+          "id": "v2",
+          "stem": "In Node, what does this log?\n```js\nsetTimeout(() => console.log('x'), 5);\nconst t0 = Date.now();\nwhile (Date.now() - t0 < 20) {}\nsetTimeout(() => console.log('y'), 0);\nconsole.log('z');\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`z x y`",
+              "correct": true,
+              "why": "`x` was due 5 ms after the start and is already late when the loop ends. `y` is created 20 ms later, so its deadline is later, even with a 0 delay."
+            },
+            {
+              "id": "b",
+              "text": "`z y x`",
+              "why": "A 0 delay is relative to when `setTimeout` is called. `y` is scheduled after the 20 ms loop, so its deadline is after the deadline of `x`."
+            },
+            {
+              "id": "c",
+              "text": "`x z y`",
+              "why": "`x` expires during the loop but cannot preempt it. A timer only queues a task, which runs after the current script."
+            }
+          ],
+          "runs": true
+        }
+      ]
+    },
+    {
+      "id": "t-node-1ms",
+      "concept": "c-timers",
+      "bloom": "apply",
+      "recallFirst": true,
+      "sources": [
+        "node-timers"
+      ],
+      "variants": [
+        {
+          "id": "v1",
+          "stem": "In Node, what does this log?\n```js\nsetTimeout(() => console.log('a'), 1);\nsetTimeout(() => console.log('b'), 0.5);\nsetTimeout(() => console.log('c'), 0);\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`a b c`",
+              "correct": true,
+              "why": "Node sets any delay below 1 ms to 1 ms. All three share the same 1 ms delay, so they run in the order they were created."
+            },
+            {
+              "id": "b",
+              "text": "`c b a`",
+              "why": "This sorts by the delays as written. Node raises 0 and 0.5 to 1, so the three deadlines are the same and call order wins."
+            },
+            {
+              "id": "c",
+              "text": "`c a b`",
+              "why": "There is no fast path for a 0 delay. In Node it becomes 1 ms, like 0.5, so `c` waits behind the earlier timers."
+            }
+          ],
+          "runs": true
+        },
+        {
+          "id": "v2",
+          "stem": "In Node, what does this log?\n```js\nsetTimeout(() => console.log('a'), 1);\nsetTimeout(() => console.log('b'), 0);\nconsole.log('c');\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`c a b`",
+              "correct": true,
+              "why": "Synchronous code runs first. Then both timers have a 1 ms delay (Node raises 0 to 1), so they fire in creation order."
+            },
+            {
+              "id": "b",
+              "text": "`c b a`",
+              "why": "This assumes 0 is shorter than 1. In Node a delay below 1 becomes 1, so both share a deadline and `a`, created first, runs first."
+            },
+            {
+              "id": "c",
+              "text": "`b c a`",
+              "why": "A 0 ms timer never runs before the current script ends. It is queued as a task like any other timer."
+            }
+          ],
+          "runs": true
+        }
+      ]
+    },
+    {
+      "id": "t-nested-clamp",
+      "concept": "c-timers",
+      "bloom": "understand",
+      "recallFirst": true,
+      "sources": [
+        "html-timers",
+        "mdn-settimeout",
+        "node-timers"
+      ],
+      "variants": [
+        {
+          "id": "v1",
+          "stem": "In a browser, a function reschedules itself with `setTimeout(step, 0)` 100 times. Each step does almost no work and the page is otherwise idle. Roughly how long does the chain take?",
+          "options": [
+            {
+              "id": "a",
+              "text": "About 0.4 s: after 5 nested levels each hop is raised to 4 ms",
+              "correct": true,
+              "why": "The HTML spec clamps nested timers to at least 4 ms once nesting passes 5, so about 95 hops of 4 ms."
+            },
+            {
+              "id": "b",
+              "text": "A few ms: a 0 ms timer runs as soon as the stack is empty",
+              "why": "A 0 delay still queues a task, and nesting triggers the 4 ms clamp, so the chain cannot run at full speed."
+            },
+            {
+              "id": "c",
+              "text": "About 1.6 s: each hop waits for the next 16 ms frame",
+              "why": "Timers are not tied to frames. A timer task can run many times between two paints; only the 4 ms clamp slows this chain."
+            }
+          ]
+        },
+        {
+          "id": "v2",
+          "stem": "The same 100-hop `setTimeout(step, 0)` chain runs in Node. How does it differ from a browser?",
+          "options": [
+            {
+              "id": "a",
+              "text": "Each hop has a 1 ms minimum and no 4 ms nesting clamp, so it finishes sooner",
+              "correct": true,
+              "why": "Node sets delays below 1 to 1 and does not apply the HTML nesting rule, so hops are about 1 ms, not 4 ms."
+            },
+            {
+              "id": "b",
+              "text": "It is the same: the 4 ms clamp is part of the JavaScript language",
+              "why": "The clamp is in the HTML spec's timer algorithm. ECMAScript defines no timers at all, and Node follows its own rules."
+            },
+            {
+              "id": "c",
+              "text": "Each hop runs at once, because Node has no timer minimum",
+              "why": "Node does have a minimum: a delay below 1 ms becomes 1 ms. Use `setImmediate` for a hop without a timer."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "t-listeners-one-task",
+      "concept": "c-events-as-tasks",
+      "bloom": "apply",
+      "recallFirst": true,
+      "sources": [
+        "jakearchibald-tasks-microtasks",
+        "node-events"
+      ],
+      "variants": [
+        {
+          "id": "v1",
+          "stem": "In a browser, the user clicks `btn`. What is logged?\n```js\nbtn.addEventListener('click', () => {\n  setTimeout(() => console.log('timeout'));\n  console.log('L1');\n});\nbtn.addEventListener('click', () => {\n  console.log('L2');\n});\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`L1 L2 timeout`",
+              "correct": true,
+              "why": "The whole dispatch, with both listeners, is one task. The timer queues a new task that runs after it."
+            },
+            {
+              "id": "b",
+              "text": "`L1 timeout L2`",
+              "why": "Listeners are not separate tasks that a timer can slip between. They all run inside the one dispatch task."
+            },
+            {
+              "id": "c",
+              "text": "`timeout L1 L2`",
+              "why": "Scheduling a timer does not run it. Its callback is queued and runs after the code that scheduled it."
+            }
+          ]
+        },
+        {
+          "id": "v2",
+          "stem": "In Node, what does this log?\n```js\nimport { EventEmitter } from 'node:events';\nconst e = new EventEmitter();\ne.on('go', () => {\n  setTimeout(() => console.log('timeout'));\n  console.log('L1');\n});\ne.on('go', () => console.log('L2'));\ne.emit('go');\nconsole.log('after');\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`L1 L2 after timeout`",
+              "correct": true,
+              "why": "`emit` calls the listeners synchronously, in order, then returns. The timer runs in a later task."
+            },
+            {
+              "id": "b",
+              "text": "`L1 timeout L2 after`",
+              "why": "The timer cannot run until the current task ends. `emit` and the code after it are all one task."
+            },
+            {
+              "id": "c",
+              "text": "`after L1 L2 timeout`",
+              "why": "`emit` is not deferred: listeners run inside the call, before the next line."
+            }
+          ],
+          "runs": true
+        }
+      ]
+    },
+    {
+      "id": "t-long-task-paint",
+      "concept": "c-long-tasks",
+      "bloom": "analyse",
+      "recallFirst": true,
+      "sources": [
+        "jakearchibald-tasks-microtasks",
+        "webdev-optimize-long-tasks"
+      ],
+      "variants": [
+        {
+          "id": "v1",
+          "stem": "What does the user see after clicking?\n```js\nbtn.onclick = () => {\n  spinner.hidden = false;\n  crunch(); // 2 s, synchronous\n  spinner.hidden = true;\n};\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "No change for 2 s, the spinner never appears, input waits",
+              "correct": true,
+              "why": "No frame is painted during a task. When the task ends the spinner is hidden again, so the shown state is never rendered."
+            },
+            {
+              "id": "b",
+              "text": "The spinner shows for 2 s, then hides",
+              "why": "That needs a paint between the two DOM writes. The browser renders only between tasks, and both writes are in one task."
+            },
+            {
+              "id": "c",
+              "text": "The spinner flashes, then the page freezes until `crunch` ends",
+              "why": "Setting `hidden` does not paint at once. Rendering waits for the task to end, after the spinner is hidden again."
+            }
+          ]
+        },
+        {
+          "id": "v2",
+          "stem": "Inside one click handler, this runs for about 2 s. What does the user see?\n```js\nfor (let i = 1; i <= 100; i++) {\n  doChunk(i); // about 20 ms\n  bar.style.width = i + '%';\n}\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "The bar jumps from 0 to 100% after about 2 s",
+              "correct": true,
+              "why": "All 100 style writes happen inside one task. The browser paints once, after the task, showing only the last value."
+            },
+            {
+              "id": "b",
+              "text": "The bar grows smoothly, one paint per iteration",
+              "why": "A style write does not trigger a paint. Painting needs the task to end so the event loop can reach a rendering step."
+            },
+            {
+              "id": "c",
+              "text": "The bar grows in steps, about one per 16 ms frame",
+              "why": "Frames cannot be produced in the middle of a task, even at 60 Hz. The display keeps the old frame until the task ends."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

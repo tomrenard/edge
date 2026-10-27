@@ -1,0 +1,657 @@
+{
+  "id": "el-node",
+  "module": "js-event-loop",
+  "title": "The Node.js event loop",
+  "goal": "Predict the order of timers, immediates, ticks and promises in Node, and name where Node differs from browsers.",
+  "pretest": [
+    "n-io-immediate",
+    "n-esm-toplevel"
+  ],
+  "requires": [
+    "el-rendering"
+  ],
+  "lastReviewed": "2026-10-27",
+  "steps": [
+    {
+      "type": "concept",
+      "id": "c-phases",
+      "title": "libuv phases",
+      "text": "Node's loop runs phases, each with a FIFO queue of callbacks: timers (`setTimeout`, `setInterval`), pending callbacks, poll (I/O callbacks; Node blocks here when idle), check (`setImmediate`), close callbacks [[c:node-phases]]. Since libuv 1.45 (Node 20), timers run after poll in each iteration, plus once before the loop starts [[c:timers-after-poll]].\n\nMicrotasks are not a phase: after each callback, Node drains the `nextTick` queue and then the promise queue, so they run between two immediates or two timers. An immediate queued from inside an immediate waits for the next iteration [[c:immediate-next-iteration]], unlike a microtask queued from a microtask.",
+      "claims": [
+        {
+          "id": "node-phases",
+          "text": "Poll runs I/O callbacks and may block; check runs setImmediate callbacks.",
+          "sources": [
+            "node-event-loop"
+          ],
+          "evidence": [
+            {
+              "source": "node-event-loop",
+              "quote": "poll: retrieve new I/O events; execute I/O related callbacks (almost all with the exception of close callbacks, the ones scheduled by timers, and setImmediate()); node will block here when appropriate. check: setImmediate() callbacks are invoked here."
+            }
+          ]
+        },
+        {
+          "id": "timers-after-poll",
+          "text": "Since libuv 1.45 (Node 20) timers run after poll, plus once before the loop starts.",
+          "sources": [
+            "node-event-loop"
+          ],
+          "evidence": [
+            {
+              "source": "node-event-loop",
+              "quote": "Starting with libuv 1.45.0 (Node.js 20), timers are run after the poll phase in each event loop iteration."
+            },
+            {
+              "source": "node-event-loop",
+              "quote": "To preserve backwards compatibility, libuv 1.45.0 still runs timers once before entering the event loop"
+            }
+          ]
+        },
+        {
+          "id": "immediate-next-iteration",
+          "text": "An immediate queued from an executing callback waits for the next iteration.",
+          "sources": [
+            "node-timers"
+          ],
+          "evidence": [
+            {
+              "source": "node-timers",
+              "quote": "If an immediate timer is queued from inside an executing callback, that timer will not be triggered until the next event loop iteration."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "question",
+      "item": "n-immediate-iteration"
+    },
+    {
+      "type": "question",
+      "item": "n-immediate-iteration",
+      "variant": "v2"
+    },
+    {
+      "type": "concept",
+      "id": "c-immediate",
+      "title": "setImmediate vs setTimeout(0)",
+      "text": "`setImmediate` runs in the check phase, once the current poll phase completes; `setTimeout(f, 0)` is a 1 ms timer [[c:immediate-vs-timeout]].\n\nFrom the main module, their order is not deterministic: it depends on whether 1 ms has passed when the loop first checks timers [[c:main-nondeterministic]]. Inside an I/O callback it is fixed: poll is followed by check, so the immediate always runs first, however many timers are due [[c:io-immediate-first]].\n\nThe Node docs recommend `setImmediate` in all cases, as it is easier to reason about [[c:prefer-immediate]]. The interview trap is answering \"timeout first\" with confidence for the main-module case.",
+      "claims": [
+        {
+          "id": "immediate-vs-timeout",
+          "text": "setImmediate runs after the poll phase; setTimeout after a minimum threshold.",
+          "sources": [
+            "node-event-loop"
+          ],
+          "evidence": [
+            {
+              "source": "node-event-loop",
+              "quote": "setImmediate() is designed to execute a script once the current poll phase completes. setTimeout() schedules a script to be run after a minimum threshold in ms has elapsed."
+            }
+          ]
+        },
+        {
+          "id": "main-nondeterministic",
+          "text": "From the main module, the order of setTimeout(0) and setImmediate is non-deterministic.",
+          "sources": [
+            "node-event-loop"
+          ],
+          "evidence": [
+            {
+              "source": "node-event-loop",
+              "quote": "if we run the following script which is not within an I/O cycle (i.e. the main module), the order in which the two timers are executed is non-deterministic, as it is bound by the performance of the process"
+            }
+          ]
+        },
+        {
+          "id": "io-immediate-first",
+          "text": "Within an I/O cycle setImmediate always runs before timers.",
+          "sources": [
+            "node-event-loop"
+          ],
+          "evidence": [
+            {
+              "source": "node-event-loop",
+              "quote": "The main advantage to using setImmediate() over setTimeout() is setImmediate() will always be executed before any timers if scheduled within an I/O cycle, independently of how many timers are present."
+            }
+          ]
+        },
+        {
+          "id": "prefer-immediate",
+          "text": "Node recommends setImmediate.",
+          "sources": [
+            "node-event-loop"
+          ],
+          "evidence": [
+            {
+              "source": "node-event-loop",
+              "quote": "We recommend developers use setImmediate() in all cases because it's easier to reason about."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "question",
+      "item": "n-io-immediate",
+      "variant": "v2"
+    },
+    {
+      "type": "question",
+      "item": "n-io-immediate",
+      "variant": "v3"
+    },
+    {
+      "type": "concept",
+      "id": "c-nexttick",
+      "title": "process.nextTick vs promises",
+      "text": "`process.nextTick` has its own queue, drained after the current operation, before the loop moves on [[c:nexttick-after-operation]]. Each time Node drains it, it drains the promise microtask queue right after [[c:tick-then-microtasks]]. Inside a callback: sync code, then all ticks, then all promise jobs. A tick queued by a promise job runs once the promise queue is empty. Recursive `nextTick` starves I/O [[c:nexttick-starve]].\n\nThe ESM twist: an ES module's top-level code already runs as part of the microtask queue, so there promise and `queueMicrotask` callbacks run before `nextTick` ones [[c:esm-microtask-first]]. The same lines in a `.cjs` and an `.mjs` file log in a different order.",
+      "claims": [
+        {
+          "id": "nexttick-after-operation",
+          "text": "The nextTick queue is processed after the current operation, whatever the phase.",
+          "sources": [
+            "node-event-loop"
+          ],
+          "evidence": [
+            {
+              "source": "node-event-loop",
+              "quote": "Instead, the nextTickQueue will be processed after the current operation is completed, regardless of the current phase of the event loop."
+            }
+          ]
+        },
+        {
+          "id": "tick-then-microtasks",
+          "text": "Node drains the microtask queue right after the next tick queue.",
+          "sources": [
+            "node-process"
+          ],
+          "evidence": [
+            {
+              "source": "node-process",
+              "quote": "Within Node.js, every time the \"next tick queue\" is drained, the microtask queue is drained immediately after."
+            }
+          ]
+        },
+        {
+          "id": "nexttick-starve",
+          "text": "Recursive nextTick calls can starve I/O.",
+          "sources": [
+            "node-event-loop"
+          ],
+          "evidence": [
+            {
+              "source": "node-event-loop",
+              "quote": "This can create some bad situations because it allows you to \"starve\" your I/O by making recursive process.nextTick() calls, which prevents the event loop from reaching the poll phase."
+            }
+          ]
+        },
+        {
+          "id": "esm-microtask-first",
+          "text": "In ESM, queueMicrotask callbacks run before nextTick ones.",
+          "sources": [
+            "node-process"
+          ],
+          "evidence": [
+            {
+              "source": "node-process",
+              "quote": "So in CJS modules process.nextTick() callbacks are always run before queueMicrotask() ones. However since ESM modules are processed already as part of the microtask queue, there queueMicrotask() callbacks are always executed before process.nextTick() ones since Node.js is already in the process of draining the microtask queue."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "question",
+      "item": "n-tick-vs-promise"
+    },
+    {
+      "type": "question",
+      "item": "n-esm-toplevel",
+      "variant": "v2"
+    },
+    {
+      "type": "question",
+      "item": "n-starve",
+      "variant": "v2"
+    },
+    {
+      "type": "concept",
+      "id": "c-node-vs-browser",
+      "title": "Node vs browser",
+      "text": "Differences that come up in interviews:\n\n- No rendering step, no rAF, no INP. The loop is phases plus two microtask queues.\n- No 4 ms nesting clamp; any delay below 1 ms becomes 1 ms [[c:node-delay-1]].\n- `setImmediate` and `process.nextTick` are Node only, and their names are backwards: `nextTick` fires sooner [[c:names-swapped]].\n- `nextTick` is not `queueMicrotask`: it is a separate queue that drains first (outside ESM top-level code).\n- An unhandled rejection ends the process by default since Node 15 [[c:node-throw-default]]. A browser fires `unhandledrejection` and goes on.",
+      "claims": [
+        {
+          "id": "node-delay-1",
+          "text": "Node sets delays below 1 to 1.",
+          "sources": [
+            "node-timers"
+          ],
+          "evidence": [
+            {
+              "source": "node-timers",
+              "quote": "When delay is larger than 2147483647 or less than 1 or NaN, the delay will be set to 1."
+            }
+          ]
+        },
+        {
+          "id": "names-swapped",
+          "text": "process.nextTick fires more immediately than setImmediate.",
+          "sources": [
+            "node-event-loop"
+          ],
+          "evidence": [
+            {
+              "source": "node-event-loop",
+              "quote": "In essence, the names should be swapped. process.nextTick() fires more immediately than setImmediate(), but this is an artifact of the past which is unlikely to change."
+            }
+          ]
+        },
+        {
+          "id": "node-throw-default",
+          "text": "Since Node 15 the default unhandled rejection mode is throw.",
+          "sources": [
+            "node-cli"
+          ],
+          "evidence": [
+            {
+              "source": "node-cli",
+              "quote": "v15.0.0 Changed default mode to throw. Previously, a warning was emitted."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "question",
+      "item": "n-vs-browser"
+    },
+    {
+      "type": "question",
+      "item": "n-vs-browser",
+      "variant": "v2"
+    },
+    {
+      "type": "recap",
+      "points": [
+        "Node phases: timers, pending, poll (I/O, may block), check (setImmediate), close; since Node 20 timers run after poll.",
+        "Main module: setTimeout(0) vs setImmediate order is not deterministic. Inside an I/O callback, setImmediate always wins.",
+        "After each callback: all nextTick callbacks, then all promise jobs. In ESM top-level code, promises run first.",
+        "Recursive nextTick or microtasks starve I/O; chunk CPU work with setImmediate.",
+        "No rendering, no 4 ms clamp (1 ms minimum), unhandled rejections end the process since Node 15."
+      ]
+    }
+  ],
+  "items": [
+    {
+      "id": "n-immediate-iteration",
+      "concept": "c-phases",
+      "bloom": "apply",
+      "recallFirst": true,
+      "sources": [
+        "node-timers",
+        "node-event-loop"
+      ],
+      "variants": [
+        {
+          "id": "v1",
+          "stem": "What does this log?\n```js\nconst log = console.log;\nsetImmediate(() => {\n  log('i1');\n  setImmediate(() => log('i3'));\n});\nsetImmediate(() => log('i2'));\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`i1 i2 i3`",
+              "correct": true,
+              "why": "`i3` is queued while the check phase runs, so it waits for the next iteration, behind `i2`."
+            },
+            {
+              "id": "b",
+              "text": "`i1 i3 i2`",
+              "why": "An immediate is not a microtask. A nested one does not run right after its parent."
+            },
+            {
+              "id": "c",
+              "text": "`i2 i1 i3`",
+              "why": "Immediates run in the order they were created."
+            }
+          ],
+          "runs": true
+        },
+        {
+          "id": "v2",
+          "stem": "What does this log?\n```js\nconst log = console.log;\nsetImmediate(() => {\n  log('i1');\n  process.nextTick(() => log('n'));\n});\nsetImmediate(() => log('i2'));\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`i1 n i2`",
+              "correct": true,
+              "why": "Node drains the nextTick and microtask queues after each callback, even between two immediates in one check phase."
+            },
+            {
+              "id": "b",
+              "text": "`i1 i2 n`",
+              "why": "Ticks are not held until the check phase ends. Node drains them after each immediate, as browsers drain microtasks after each task."
+            },
+            {
+              "id": "c",
+              "text": "`n i1 i2`",
+              "why": "The tick is queued only when the first immediate runs."
+            }
+          ],
+          "runs": true
+        }
+      ]
+    },
+    {
+      "id": "n-io-immediate",
+      "concept": "c-immediate",
+      "bloom": "apply",
+      "recallFirst": true,
+      "sources": [
+        "node-event-loop"
+      ],
+      "variants": [
+        {
+          "id": "v1",
+          "stem": "What does this log?\n```js\nimport { readFile } from 'node:fs';\nconst log = console.log;\nreadFile(new URL(import.meta.url), () => {\n  setTimeout(() => log('timeout'), 0);\n  setImmediate(() => log('immediate'));\n});\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`immediate timeout`",
+              "correct": true,
+              "why": "The callback runs in the poll phase. Check comes next, so the immediate runs before the loop reaches timers again."
+            },
+            {
+              "id": "b",
+              "text": "`timeout immediate`",
+              "why": "A 0 ms timer is not faster than an immediate here. After poll the loop goes to check, and only then to timers."
+            },
+            {
+              "id": "c",
+              "text": "Either order, depending on timing",
+              "why": "That is the main-module case. Inside an I/O callback the phase order fixes it: immediate first."
+            }
+          ],
+          "runs": true
+        },
+        {
+          "id": "v2",
+          "stem": "What does this log?\n```js\nimport { readFile } from 'node:fs';\nconst log = console.log;\nreadFile(new URL(import.meta.url), () => {\n  setTimeout(() => log('t'));\n  setImmediate(() => log('i'));\n  Promise.resolve().then(() => log('p'));\n  process.nextTick(() => log('n'));\n});\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`n p i t`",
+              "correct": true,
+              "why": "After the callback: the nextTick queue, then promise jobs. Then the check phase (`i`), then timers (`t`)."
+            },
+            {
+              "id": "b",
+              "text": "`p n i t`",
+              "why": "In a callback, the nextTick queue drains before promise jobs. Promise-first applies only to ESM top-level code."
+            },
+            {
+              "id": "c",
+              "text": "`n p t i`",
+              "why": "Inside an I/O callback, check comes before timers, so the immediate runs first."
+            }
+          ],
+          "runs": true
+        },
+        {
+          "id": "v3",
+          "stem": "A CommonJS main script, not inside any callback, runs `setTimeout(a, 0); setImmediate(b);`. Which order is guaranteed?",
+          "options": [
+            {
+              "id": "a",
+              "text": "None: it depends on whether 1 ms passed before timers are checked",
+              "correct": true,
+              "why": "Node's docs call this order non-deterministic, bound by the performance of the process."
+            },
+            {
+              "id": "b",
+              "text": "`a` first: timers come first in the loop",
+              "why": "The 0 ms timer is really 1 ms. If that 1 ms has not passed when timers are checked, the immediate runs first."
+            },
+            {
+              "id": "c",
+              "text": "`b` first: setImmediate always beats a timer",
+              "why": "That holds only inside an I/O callback, where check directly follows poll."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "n-tick-vs-promise",
+      "concept": "c-nexttick",
+      "bloom": "apply",
+      "recallFirst": true,
+      "sources": [
+        "node-process",
+        "node-event-loop"
+      ],
+      "variants": [
+        {
+          "id": "v1",
+          "stem": "What does this log?\n```js\nconst log = console.log;\nsetTimeout(() => {\n  Promise.resolve().then(() => log('p'));\n  process.nextTick(() => log('n'));\n  queueMicrotask(() => log('q'));\n  log('s');\n});\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`s n p q`",
+              "correct": true,
+              "why": "Inside a callback, the nextTick queue drains first, then the promise queue in FIFO order (`p` then `q`)."
+            },
+            {
+              "id": "b",
+              "text": "`s p n q`",
+              "why": "Queueing order does not mix the two queues. All ticks run before any promise job."
+            },
+            {
+              "id": "c",
+              "text": "`s p q n`",
+              "why": "That is the order for ESM top-level code. Inside a timer callback, ticks run first."
+            }
+          ],
+          "runs": true
+        },
+        {
+          "id": "v2",
+          "stem": "What does this log?\n```js\nconst log = console.log;\nsetTimeout(() => {\n  Promise.resolve()\n    .then(() => {\n      log('p1');\n      process.nextTick(() => log('n'));\n    })\n    .then(() => log('p2'));\n});\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`p1 p2 n`",
+              "correct": true,
+              "why": "Once Node is draining promise jobs, it drains them all, including `p2`, queued by `p1`. Ticks queued meanwhile run after."
+            },
+            {
+              "id": "b",
+              "text": "`p1 n p2`",
+              "why": "Ticks do not interrupt the promise queue. Node checks the nextTick queue again only after the promise queue is empty."
+            },
+            {
+              "id": "c",
+              "text": "`n p1 p2`",
+              "why": "The tick is queued only when `p1` runs."
+            }
+          ],
+          "runs": true
+        }
+      ]
+    },
+    {
+      "id": "n-esm-toplevel",
+      "concept": "c-nexttick",
+      "bloom": "analyse",
+      "recallFirst": true,
+      "sources": [
+        "node-process"
+      ],
+      "variants": [
+        {
+          "id": "v1",
+          "stem": "Saved as `main.mjs` and run with `node main.mjs`. What does it log?\n```js\nprocess.nextTick(() => console.log('tick'));\nPromise.resolve()\n  .then(() => console.log('promise'));\nconsole.log('sync');\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`sync promise tick`",
+              "correct": true,
+              "why": "ES module code is already running as part of the microtask queue, so promise jobs drain before Node gets to the nextTick queue."
+            },
+            {
+              "id": "b",
+              "text": "`sync tick promise`",
+              "why": "That is the CommonJS order. In an ES module, top-level code runs inside the microtask drain, so promises go first."
+            },
+            {
+              "id": "c",
+              "text": "`tick promise sync`",
+              "why": "Neither queue can run before the synchronous code ends."
+            }
+          ],
+          "runs": true
+        },
+        {
+          "id": "v2",
+          "stem": "Saved as `main.mjs`. What does it log?\n```js\nconst log = console.log;\nprocess.nextTick(() => log('n1'));\nqueueMicrotask(() => {\n  log('q');\n  process.nextTick(() => log('n2'));\n});\nlog('s');\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`s q n1 n2`",
+              "correct": true,
+              "why": "In ESM, the microtask queue drains first (`q`). Then the nextTick queue runs `n1` and `n2` in FIFO order."
+            },
+            {
+              "id": "b",
+              "text": "`s n1 q n2`",
+              "why": "This is the CommonJS view, where ticks run first. In a module, the microtask drain is already in progress."
+            },
+            {
+              "id": "c",
+              "text": "`s q n2 n1`",
+              "why": "The nextTick queue is FIFO too. `n1` was queued first."
+            }
+          ],
+          "runs": true
+        }
+      ],
+      "versions": {
+        "node": "26"
+      },
+      "reviewBy": "2027-10-27"
+    },
+    {
+      "id": "n-starve",
+      "concept": "c-nexttick",
+      "bloom": "analyse",
+      "recallFirst": true,
+      "sources": [
+        "node-event-loop"
+      ],
+      "variants": [
+        {
+          "id": "v1",
+          "stem": "What does this log?\n```js\nlet n = 0;\nsetImmediate(() => console.log('imm', n));\n(function spin() {\n  if (++n < 1000) process.nextTick(spin);\n})();\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`imm 1000`",
+              "correct": true,
+              "why": "The nextTick queue drains fully, including ticks added while draining, before the loop reaches the check phase."
+            },
+            {
+              "id": "b",
+              "text": "`imm 1`",
+              "why": "The immediate has no turn between ticks. Ticks run before the loop moves to any phase."
+            },
+            {
+              "id": "c",
+              "text": "`imm 2`",
+              "why": "There is no per-pass limit on ticks. Every recursive tick runs before the loop continues."
+            }
+          ],
+          "runs": true
+        },
+        {
+          "id": "v2",
+          "stem": "A Node server must hash 10 000 files (CPU work) without blocking other requests. It processes one file per step. How should it schedule the next step?",
+          "options": [
+            {
+              "id": "a",
+              "text": "`setImmediate(step)`: the poll phase runs between steps",
+              "correct": true,
+              "why": "Each step is a new check-phase callback, so the loop passes through poll and serves I/O between steps."
+            },
+            {
+              "id": "b",
+              "text": "`process.nextTick(step)`: it is the fastest way back",
+              "why": "nextTick runs before the loop continues. A chain of them never reaches poll, so requests starve until all files are done."
+            },
+            {
+              "id": "c",
+              "text": "`queueMicrotask(step)`: microtasks let I/O in",
+              "why": "Microtasks drain before the loop continues, just like ticks. I/O waits until the chain ends."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "n-vs-browser",
+      "concept": "c-node-vs-browser",
+      "bloom": "understand",
+      "recallFirst": true,
+      "sources": [
+        "node-cli",
+        "mdn-unhandledrejection",
+        "node-process"
+      ],
+      "variants": [
+        {
+          "id": "v1",
+          "stem": "`loadUser()` returns a promise that rejects, and no code handles it. What happens in a browser and in Node 20 with default flags?",
+          "options": [
+            {
+              "id": "a",
+              "text": "Browser: event, page goes on. Node: process exits with an error",
+              "correct": true,
+              "why": "Browsers fire `unhandledrejection`. Node's default mode `throw` raises it as an uncaught exception, which ends the process."
+            },
+            {
+              "id": "b",
+              "text": "Both log a warning to the console and keep running",
+              "why": "Node only warned before v15. Since then the default is `throw`."
+            },
+            {
+              "id": "c",
+              "text": "Both treat it as an uncaught error and stop the program",
+              "why": "A browser never tears down the page for an unhandled rejection; it reports it and keeps running."
+            }
+          ]
+        },
+        {
+          "id": "v2",
+          "stem": "A colleague says: \"`process.nextTick` is just Node's name for `queueMicrotask`\". What is wrong with that?",
+          "options": [
+            {
+              "id": "a",
+              "text": "It is a separate queue, drained before promise jobs (outside ESM top level)",
+              "correct": true,
+              "why": "Node drains the nextTick queue, then the microtask queue. So in a callback, a tick queued after a promise job still runs first."
+            },
+            {
+              "id": "b",
+              "text": "Nothing: both put callbacks in V8's one microtask queue",
+              "why": "V8's queue holds promise jobs and `queueMicrotask`. Ticks live in Node's own queue, drained first."
+            },
+            {
+              "id": "c",
+              "text": "nextTick runs in the check phase, like setImmediate",
+              "why": "nextTick is not part of any phase. It runs after the current operation, before the loop moves on."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

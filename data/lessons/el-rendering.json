@@ -1,0 +1,621 @@
+{
+  "id": "el-rendering",
+  "module": "js-event-loop",
+  "title": "Rendering and yielding",
+  "goal": "Explain where a frame fits in the browser loop, how long tasks hurt INP, and how to yield properly.",
+  "pretest": [
+    "r-microtask-no-yield",
+    "r-inp"
+  ],
+  "requires": [
+    "el-async-await"
+  ],
+  "lastReviewed": "2026-10-27",
+  "steps": [
+    {
+      "type": "concept",
+      "id": "c-render-step",
+      "title": "Rendering is not every turn",
+      "text": "A window event loop draws a frame only at a [rendering opportunity](g:rendering-opportunity), set by the display refresh rate and by throttling: at 60 Hz, at most about every 16.7 ms [[c:render-opportunity]]. In the current HTML spec, each opportunity queues a task to update the rendering [[c:render-is-task]]. That task runs resize and scroll steps, then animation frame callbacks, then style and layout, then paint [[c:raf-then-layout]].\n\nSo rendering is neither \"after every task\" nor \"after every microtask checkpoint\". Dozens of short tasks can run between two frames, and a hidden tab gets almost none: rAF is paused in background tabs [[c:raf-paused]].",
+      "claims": [
+        {
+          "id": "render-opportunity",
+          "text": "At 60 Hz, rendering opportunities occur at most every 16.7 ms.",
+          "sources": [
+            "html-event-loops"
+          ],
+          "evidence": [
+            {
+              "source": "html-event-loops",
+              "quote": "But for example, if the browser is attempting to achieve a 60Hz refresh rate, then rendering opportunities occur at a maximum of every 60th of a second (about 16.7ms)."
+            }
+          ]
+        },
+        {
+          "id": "render-is-task",
+          "text": "Each rendering opportunity queues a task to update the rendering.",
+          "sources": [
+            "html-event-loops"
+          ],
+          "evidence": [
+            {
+              "source": "html-event-loops",
+              "quote": "For each navigable that has a rendering opportunity, queue a global task on the rendering task source given navigable's active window to update the rendering"
+            }
+          ]
+        },
+        {
+          "id": "raf-then-layout",
+          "text": "Update the rendering runs resize and scroll steps, then animation frame callbacks, then style and layout.",
+          "sources": [
+            "html-event-loops"
+          ],
+          "evidence": [
+            {
+              "source": "html-event-loops",
+              "quote": "For each doc of docs, run the resize steps for doc."
+            },
+            {
+              "source": "html-event-loops",
+              "quote": "For each doc of docs, run the animation frame callbacks for doc, passing in the relative high resolution time given frameTimestamp and doc's relevant global object as the timestamp."
+            },
+            {
+              "source": "html-event-loops",
+              "quote": "Recalculate styles and update layout for doc."
+            }
+          ]
+        },
+        {
+          "id": "raf-paused",
+          "text": "rAF is paused in background tabs in most browsers.",
+          "sources": [
+            "mdn-requestanimationframe"
+          ],
+          "evidence": [
+            {
+              "source": "mdn-requestanimationframe",
+              "quote": "requestAnimationFrame() calls are paused in most browsers when running in background tabs or hidden <iframe>s, in order to improve performance and battery life."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "question",
+      "item": "r-render-step"
+    },
+    {
+      "type": "question",
+      "item": "r-render-step",
+      "variant": "v2"
+    },
+    {
+      "type": "concept",
+      "id": "c-raf",
+      "title": "requestAnimationFrame",
+      "text": "rAF runs your callback before the next repaint [[c:raf-before-repaint]]: the last moment to write styles for this frame. Its rate generally matches the display refresh rate [[c:raf-rate]], and it is one-shot: call it again inside the callback to animate the next frame [[c:raf-one-shot]]. A run uses the callbacks listed at its start, so one added during it waits a frame [[c:raf-snapshot]].\n\nIts order against timers is not fixed. A `setTimeout(a, 0)` and a `requestAnimationFrame(b)` queued together can run in either order: the loop picks the next task queue as it likes [[c:task-queue-choice]], and it depends on how close the next rendering opportunity is. Microtasks are fixed: they run before either, at the end of the current task. A long task delays the frame; rAF cannot bring it sooner.",
+      "claims": [
+        {
+          "id": "raf-before-repaint",
+          "text": "rAF calls the callback before the next repaint.",
+          "sources": [
+            "mdn-requestanimationframe"
+          ],
+          "evidence": [
+            {
+              "source": "mdn-requestanimationframe",
+              "quote": "It requests the browser to call a user-supplied callback function before the next repaint."
+            }
+          ]
+        },
+        {
+          "id": "raf-rate",
+          "text": "rAF frequency generally matches the display refresh rate.",
+          "sources": [
+            "mdn-requestanimationframe"
+          ],
+          "evidence": [
+            {
+              "source": "mdn-requestanimationframe",
+              "quote": "The frequency of calls to the callback function will generally match the display refresh rate."
+            }
+          ]
+        },
+        {
+          "id": "raf-one-shot",
+          "text": "rAF is one-shot.",
+          "sources": [
+            "mdn-requestanimationframe"
+          ],
+          "evidence": [
+            {
+              "source": "mdn-requestanimationframe",
+              "quote": "Your callback function must call requestAnimationFrame() again if you want to animate another frame. requestAnimationFrame() is one-shot."
+            }
+          ]
+        },
+        {
+          "id": "raf-snapshot",
+          "text": "Running animation frame callbacks takes the list of handles at the start, so callbacks added during the run wait for the next frame.",
+          "sources": [
+            "html-animation-frames"
+          ],
+          "evidence": [
+            {
+              "source": "html-animation-frames",
+              "quote": "Let callbackHandles be the result of getting the keys of callbacks."
+            }
+          ]
+        },
+        {
+          "id": "task-queue-choice",
+          "text": "Which task queue runs next is implementation-defined.",
+          "sources": [
+            "html-event-loops"
+          ],
+          "evidence": [
+            {
+              "source": "html-event-loops",
+              "quote": "Let taskQueue be one such task queue, chosen in an implementation-defined manner."
+            },
+            {
+              "source": "html-event-loops",
+              "quote": "Concretely, a user agent might wish to coalesce timer callbacks together, with no intermediate rendering updates."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "question",
+      "item": "r-raf-placement"
+    },
+    {
+      "type": "question",
+      "item": "r-raf-placement",
+      "variant": "v2"
+    },
+    {
+      "type": "concept",
+      "id": "c-inp",
+      "title": "Long tasks and INP",
+      "text": "INP looks at the latency of all interactions on a page and reports one value that all or nearly all of them were beneath [[c:inp-def]]. Each interaction has three parts: input delay (until its first handler starts), processing (all its handlers), and presentation delay (until the next frame is shown) [[c:inp-parts]]. Good is 200 ms or less [[c:inp-200]], measured at the 75th percentile.\n\nA fast handler does not save you. If a 250 ms task was running when the user clicked, input delay alone is up to 250 ms. A 20 ms handler that adds 5000 DOM nodes pays for style and layout as presentation delay. Long tasks hurt all three parts.",
+      "claims": [
+        {
+          "id": "inp-def",
+          "text": "INP observes all interactions and reports a value nearly all were beneath.",
+          "sources": [
+            "webdev-inp"
+          ],
+          "evidence": [
+            {
+              "source": "webdev-inp",
+              "quote": "INP observes the latency of all interactions a user has made with the page, and reports a single value which all (or nearly all) interactions were beneath."
+            }
+          ]
+        },
+        {
+          "id": "inp-parts",
+          "text": "INP is input delay, processing duration and presentation delay.",
+          "sources": [
+            "webdev-inp"
+          ],
+          "evidence": [
+            {
+              "source": "webdev-inp",
+              "quote": "This makes the input delay the time before any callback for an interaction is handled, the processing duration the time for all the callbacks to execute, and the presentation delay the time after the callbacks have been executed until the frame is presented on the user's screen."
+            }
+          ]
+        },
+        {
+          "id": "inp-200",
+          "text": "An INP of 200 ms or less, measured at the 75th percentile, is good.",
+          "sources": [
+            "webdev-inp"
+          ],
+          "evidence": [
+            {
+              "source": "webdev-inp",
+              "quote": "An INP below or at 200 milliseconds means a page has good responsiveness."
+            },
+            {
+              "source": "webdev-inp",
+              "quote": "a good threshold to measure is the 75th percentile of page loads recorded in the field, segmented across mobile and desktop devices"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "question",
+      "item": "r-inp",
+      "variant": "v2"
+    },
+    {
+      "type": "concept",
+      "id": "c-yield",
+      "title": "Yielding to the main thread",
+      "text": "To let input and paint in, end the task and continue in a new one. `await new Promise((r) => setTimeout(r, 0))` works, but the continuation goes to the end of the queue, behind every task already waiting [[c:settimeout-back]]. `await scheduler.yield()` also continues in a new task, but that continuation is prioritized over other similar tasks [[c:yield-prioritized]]. `scheduler.postTask(fn, { priority })` queues work at `user-blocking`, `user-visible` (the default) or `background` [[c:posttask-priorities]].\n\nWhat does not yield: `await null`, `await Promise.resolve()`, `queueMicrotask`. They stay inside the current checkpoint, so a loop of them blocks the page like `while (true)`.",
+      "claims": [
+        {
+          "id": "settimeout-back",
+          "text": "A setTimeout continuation is added to the end of the task queue.",
+          "sources": [
+            "webdev-optimize-long-tasks"
+          ],
+          "evidence": [
+            {
+              "source": "webdev-optimize-long-tasks",
+              "quote": "when you yield to the main thread by deferring code to run in a subsequent task using setTimeout, that task gets added to the end of the queue. If there are other tasks waiting, they will run before your deferred code."
+            }
+          ]
+        },
+        {
+          "id": "yield-prioritized",
+          "text": "scheduler.yield() continuations are prioritized.",
+          "sources": [
+            "webdev-optimize-long-tasks"
+          ],
+          "evidence": [
+            {
+              "source": "webdev-optimize-long-tasks",
+              "quote": "The real benefit of scheduler.yield() over other yielding approaches, though, is that its continuation is prioritized, which means that if you yield in the middle of a task, the continuation of the current task will run before any other similar tasks are started."
+            }
+          ]
+        },
+        {
+          "id": "posttask-priorities",
+          "text": "postTask has three priorities; user-visible is the default.",
+          "sources": [
+            "mdn-prioritized-task-scheduling"
+          ],
+          "evidence": [
+            {
+              "source": "mdn-prioritized-task-scheduling",
+              "quote": "There are just three priorities, which are listed below (ordered from highest to lowest):"
+            },
+            {
+              "source": "mdn-prioritized-task-scheduling",
+              "quote": "This is the default priority for scheduler.postTask() and scheduler.yield()."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "question",
+      "item": "r-microtask-no-yield",
+      "variant": "v2"
+    },
+    {
+      "type": "question",
+      "item": "r-yield-choice"
+    },
+    {
+      "type": "question",
+      "item": "r-yield-choice",
+      "variant": "v2"
+    },
+    {
+      "type": "recap",
+      "points": [
+        "Frames happen only at rendering opportunities (about every 16.7 ms at 60 Hz, none in hidden tabs), not after every task.",
+        "The rendering update runs rAF callbacks, then style, layout, paint. rAF is one-shot; its order against a 0 ms timer is not fixed.",
+        "INP = input delay + processing + presentation delay; 200 ms or less is good. Another long task counts as input delay.",
+        "Yield by ending the task: setTimeout continues at the back of the queue, scheduler.yield() with priority.",
+        "await Promise.resolve() and queueMicrotask do not yield; a loop of them freezes the page."
+      ]
+    }
+  ],
+  "items": [
+    {
+      "id": "r-microtask-no-yield",
+      "concept": "c-yield",
+      "bloom": "analyse",
+      "recallFirst": true,
+      "sources": [
+        "mdn-microtask-guide",
+        "webdev-optimize-long-tasks"
+      ],
+      "variants": [
+        {
+          "id": "v1",
+          "stem": "A click handler calls this with 400 items (2 s in all). Does the page paint or react to input during those 2 s?\n```js\nasync function processAll(items) {\n  for (const it of items) {\n    render(it); // about 5 ms\n    await Promise.resolve();\n  }\n}\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "No: every resume is a microtask, so it acts as one 2 s task",
+              "correct": true,
+              "why": "The checkpoint drains microtasks until empty, and each `await` queues the next step as a microtask. No task, input or frame gets in."
+            },
+            {
+              "id": "b",
+              "text": "Yes: each `await` yields, so it paints about once per frame",
+              "why": "`await` yields only to microtasks. Rendering and input need the task and its checkpoint to end."
+            },
+            {
+              "id": "c",
+              "text": "It paints but ignores input: rendering runs at microtask checkpoints",
+              "why": "Rendering is its own step at a rendering opportunity, never inside a checkpoint."
+            }
+          ]
+        },
+        {
+          "id": "v2",
+          "stem": "The same loop now awaits a timer between items. Does the page paint or react to input during the run?\n```js\nasync function processAll(items) {\n  for (const it of items) {\n    render(it); // about 5 ms\n    await new Promise((r) => setTimeout(r));\n  }\n}\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "Yes: each item resumes in a new task, so input and frames can run between",
+              "correct": true,
+              "why": "The timer callback is a task. Between tasks the browser can handle input and render. The run takes longer, partly due to timer clamping."
+            },
+            {
+              "id": "b",
+              "text": "No: `await` keeps the whole loop in the same task",
+              "why": "Only microtask-based awaits stay in the same task. Here the promise is resolved by a timer task, so each step starts a new task."
+            },
+            {
+              "id": "c",
+              "text": "It paints between items, but input waits until the loop ends",
+              "why": "Input events are tasks too. Once the loop gives back the thread, they compete with the timer tasks."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "r-render-step",
+      "concept": "c-render-step",
+      "bloom": "understand",
+      "recallFirst": true,
+      "sources": [
+        "html-event-loops",
+        "mdn-requestanimationframe"
+      ],
+      "variants": [
+        {
+          "id": "v1",
+          "stem": "On an idle 60 Hz screen, a script queues 1000 `setTimeout(f, 0)` callbacks at once. Each changes `el.textContent` and takes 0.1 ms. How often is `el` painted while they run?",
+          "options": [
+            {
+              "id": "a",
+              "text": "Only at rendering opportunities, at most about once per 16.7 ms",
+              "correct": true,
+              "why": "Frames are tied to rendering opportunities, not tasks. The 1000 tasks take about 100 ms, so only a handful of frames show intermediate text."
+            },
+            {
+              "id": "b",
+              "text": "1000 times: the browser renders after every task",
+              "why": "The loop may render between tasks, but only when a rendering opportunity has come. Most tasks end with no frame."
+            },
+            {
+              "id": "c",
+              "text": "Once, after the timer queue is empty",
+              "why": "Browsers do not wait for the queues to empty. The spec lets them batch timer tasks and skip frames, but at a rendering opportunity they can update the rendering between two timer tasks, and in practice do."
+            }
+          ]
+        },
+        {
+          "id": "v2",
+          "stem": "A tab is in the background. A script calls `requestAnimationFrame(tick)` and `setTimeout(log, 1000)`. What happens?",
+          "options": [
+            {
+              "id": "a",
+              "text": "The timer fires, maybe throttled; `tick` waits for the tab",
+              "correct": true,
+              "why": "A hidden tab has no rendering opportunities, and most browsers pause rAF there. Timers keep running, often throttled."
+            },
+            {
+              "id": "b",
+              "text": "Both run as usual; only painting is skipped",
+              "why": "rAF callbacks are part of the rendering update. With no rendering opportunity they are not called."
+            },
+            {
+              "id": "c",
+              "text": "Both are paused until the tab is visible",
+              "why": "Timers are not tied to rendering. Browsers may throttle them in background tabs, but they still run."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "r-raf-placement",
+      "concept": "c-raf",
+      "bloom": "understand",
+      "recallFirst": true,
+      "sources": [
+        "mdn-requestanimationframe",
+        "html-event-loops",
+        "html-animation-frames"
+      ],
+      "variants": [
+        {
+          "id": "v1",
+          "stem": "Where does a `requestAnimationFrame` callback run?",
+          "options": [
+            {
+              "id": "a",
+              "text": "In the rendering update, before that frame's style, layout and paint",
+              "correct": true,
+              "why": "rAF callbacks run in the update the rendering steps, before style and layout. Styles you write there are used in the same frame."
+            },
+            {
+              "id": "b",
+              "text": "After paint, so it can read what was just drawn",
+              "why": "rAF runs before the repaint. Code that must run after a frame often uses a rAF plus a `setTimeout`."
+            },
+            {
+              "id": "c",
+              "text": "After each task, before the next task starts",
+              "why": "That is the microtask checkpoint. rAF runs only at rendering opportunities, so many tasks can pass without one."
+            }
+          ]
+        },
+        {
+          "id": "v2",
+          "stem": "A click handler calls `setTimeout(a, 0)` and then `requestAnimationFrame(b)`. Which order is guaranteed?",
+          "options": [
+            {
+              "id": "a",
+              "text": "None: it depends on how close the next rendering opportunity is",
+              "correct": true,
+              "why": "The timer task and the rendering update are separate tasks, and the spec does not fix which runs first. Both orders happen in practice."
+            },
+            {
+              "id": "b",
+              "text": "`a` first: queued tasks always run before rAF",
+              "why": "If a rendering opportunity is already due, the rendering update can run before the timer task."
+            },
+            {
+              "id": "c",
+              "text": "`b` first: rAF runs before any queued task",
+              "why": "rAF waits for a rendering opportunity, which may be up to a frame away. The timer can run before that."
+            }
+          ]
+        },
+        {
+          "id": "v3",
+          "stem": "Inside a rAF callback, the code calls `requestAnimationFrame(step)` to animate. When does `step` run?",
+          "options": [
+            {
+              "id": "a",
+              "text": "In the next frame's rendering update",
+              "correct": true,
+              "why": "rAF is one-shot and schedules for the next repaint. A callback added while callbacks run waits for the following frame."
+            },
+            {
+              "id": "b",
+              "text": "Right after the current callback, in the same frame",
+              "why": "That would make a rAF loop spin without ever painting. New callbacks wait for the next frame."
+            },
+            {
+              "id": "c",
+              "text": "After the next task, whether or not a frame is due",
+              "why": "rAF callbacks run only in a rendering update, which needs a rendering opportunity."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "r-inp",
+      "concept": "c-inp",
+      "bloom": "analyse",
+      "recallFirst": true,
+      "sources": [
+        "webdev-inp",
+        "webdev-optimize-long-tasks"
+      ],
+      "variants": [
+        {
+          "id": "v1",
+          "stem": "A user clicks just as a 250 ms analytics task starts. The click handler then takes 30 ms and the frame is shown 10 ms after it. What latency does this interaction report to INP?",
+          "options": [
+            {
+              "id": "a",
+              "text": "About 290 ms: all three parts count",
+              "correct": true,
+              "why": "INP counts input delay (250 ms waiting for the task), processing (30 ms) and presentation delay (10 ms)."
+            },
+            {
+              "id": "b",
+              "text": "About 40 ms: only the handler and paint count",
+              "why": "Input delay is part of INP. Time spent waiting behind another task counts against the interaction."
+            },
+            {
+              "id": "c",
+              "text": "About 30 ms: INP measures handler run time",
+              "why": "INP measures from input to the next painted frame, not handler time alone."
+            }
+          ]
+        },
+        {
+          "id": "v2",
+          "stem": "A click handler runs for 20 ms and inserts 5000 DOM nodes. Style and layout then take 400 ms before the frame is shown. What latency does this interaction report?",
+          "options": [
+            {
+              "id": "a",
+              "text": "About 420 ms: presentation delay counts",
+              "correct": true,
+              "why": "The time after the handlers until the frame is shown is presentation delay, part of INP."
+            },
+            {
+              "id": "b",
+              "text": "About 20 ms: browser work after the handler is not counted",
+              "why": "INP ends at the next frame shown, so the style and layout cost of the update is included."
+            },
+            {
+              "id": "c",
+              "text": "Nothing: the long rendering is a long task, not an interaction",
+              "why": "The interaction's latency runs until its frame is presented, so the rendering cost is reported in it."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "r-yield-choice",
+      "concept": "c-yield",
+      "bloom": "evaluate",
+      "recallFirst": true,
+      "sources": [
+        "webdev-optimize-long-tasks",
+        "mdn-prioritized-task-scheduling",
+        "mdn-scheduler-yield"
+      ],
+      "variants": [
+        {
+          "id": "v1",
+          "stem": "A click handler processes 5000 items for 2 s. You want input and paint between chunks, and you want the rest of this job to run before tasks that third-party scripts have queued. What do you await between chunks?",
+          "options": [
+            {
+              "id": "a",
+              "text": "`scheduler.yield()`",
+              "correct": true,
+              "why": "It ends the task and resumes in a new one whose continuation is prioritized ahead of similar queued tasks."
+            },
+            {
+              "id": "b",
+              "text": "`new Promise((r) => setTimeout(r, 0))`",
+              "why": "It yields, but the continuation goes to the end of the queue, so third-party tasks can run first."
+            },
+            {
+              "id": "c",
+              "text": "`Promise.resolve()`",
+              "why": "It does not yield at all: the continuation is a microtask, so input and paint stay blocked."
+            }
+          ]
+        },
+        {
+          "id": "v2",
+          "stem": "An analytics batcher sends events. It should run only when nothing more important is waiting, and never compete with input. How do you schedule `send`?",
+          "options": [
+            {
+              "id": "a",
+              "text": "`scheduler.postTask(send, { priority: 'background' })`",
+              "correct": true,
+              "why": "Background is the lowest of the three priorities, so input-related and default tasks go first."
+            },
+            {
+              "id": "b",
+              "text": "`scheduler.postTask(send, { priority: 'user-blocking' })`",
+              "why": "user-blocking is the highest priority, for work the user waits on. It would compete with input."
+            },
+            {
+              "id": "c",
+              "text": "`queueMicrotask(send)`",
+              "why": "A microtask runs before any task, input included, at the end of the current task."
+            }
+          ]
+        }
+      ],
+      "versions": {
+        "chrome": "129",
+        "firefox": "142"
+      },
+      "reviewBy": "2027-10-27"
+    }
+  ]
+}

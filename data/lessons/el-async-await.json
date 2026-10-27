@@ -1,0 +1,607 @@
+{
+  "id": "el-async-await",
+  "module": "js-event-loop",
+  "title": "async/await under the hood",
+  "goal": "Count the microtasks behind await and return, and predict where errors from async code end up.",
+  "pretest": [
+    "a-await-ticks",
+    "a-try-return"
+  ],
+  "requires": [
+    "el-microtasks"
+  ],
+  "lastReviewed": "2026-10-27",
+  "steps": [
+    {
+      "type": "concept",
+      "id": "c-await-tick",
+      "title": "One await, one microtask",
+      "text": "An async function runs synchronously until its first `await`; there control returns to the caller [[c:sync-until-await]]. `await x` first does `PromiseResolve(%Promise%, x)` [[c:await-promiseresolve]]: a native promise is used as is, anything else is wrapped. The rest of the function resumes in a promise reaction job once that promise is fulfilled.\n\nOn a native promise that is one microtask. It used to be three: V8 proposed the change, and it is now in the spec [[c:await-one-tick]]. Old blog posts and answers still show the three-tick orders.\n\nEven `await null` yields: everything already in the microtask queue runs first [[c:await-always-yields]].",
+      "claims": [
+        {
+          "id": "sync-until-await",
+          "text": "Code before the first await runs synchronously; at await, control returns to the caller.",
+          "sources": [
+            "mdn-await"
+          ],
+          "evidence": [
+            {
+              "source": "mdn-await",
+              "quote": "Control exits the function and returns to the caller."
+            }
+          ]
+        },
+        {
+          "id": "await-promiseresolve",
+          "text": "Await converts its operand with PromiseResolve.",
+          "sources": [
+            "ecma-control-abstraction"
+          ],
+          "evidence": [
+            {
+              "source": "ecma-control-abstraction",
+              "quote": "Let promise be ? PromiseResolve(%Promise%, arg)."
+            }
+          ]
+        },
+        {
+          "id": "await-one-tick",
+          "text": "Using promiseResolve in await saved two microtask ticks when awaiting a promise.",
+          "sources": [
+            "v8-fast-async"
+          ],
+          "evidence": [
+            {
+              "source": "v8-fast-async",
+              "quote": "This way you save one of the additional promises, plus two ticks on the microtask queue, for the common case that the value passed to await is already a promise."
+            },
+            {
+              "source": "v8-fast-async",
+              "quote": "for each await the engine has to create two additional promises (even if the right hand side is already a promise) and it needs at least three microtask queue ticks."
+            }
+          ]
+        },
+        {
+          "id": "await-always-yields",
+          "text": "await yields even for a resolved promise or a non-promise.",
+          "sources": [
+            "mdn-await"
+          ],
+          "evidence": [
+            {
+              "source": "mdn-await",
+              "quote": "This happens even if the awaited value is an already-resolved promise or not a promise: execution doesn't return to the current function until all other already-scheduled microtasks are processed."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "example",
+      "id": "x-await-trace",
+      "title": "Trace an await",
+      "problem": "What does this log?\n```js\nconst log = console.log;\nasync function f() {\n  log('f1');\n  await g();\n  log('f2');\n}\nasync function g() { log('g'); }\nf();\nPromise.resolve().then(() => log('p'));\nlog('s');\n```",
+      "steps": [
+        "`f()` runs synchronously: logs `f1`, then calls `g()`, which also runs synchronously and logs `g`. `g` returns an already fulfilled native promise.",
+        "`await` on a native fulfilled promise queues one reaction job: resume `f`. Microtasks: [resume f]. `f()` returns its pending promise to the script.",
+        "`Promise.resolve().then(...)` queues its reaction at once. Microtasks: [resume f, p].",
+        "The script logs `s` and ends. The checkpoint runs `resume f` (logs `f2`), then `p`.",
+        "Output: `f1 g s f2 p`. With the old three-tick await, `p` would have come before `f2`."
+      ]
+    },
+    {
+      "type": "question",
+      "item": "a-await-ticks",
+      "variant": "v2"
+    },
+    {
+      "type": "concept",
+      "id": "c-thenables",
+      "title": "Thenables and returned promises cost more",
+      "text": "The one-tick path needs a native promise. Awaiting a [thenable](g:thenable), such as a promise from another library, wraps it: resolving the wrapper with a thenable queues a job that calls its `then` [[c:thenable-job]], and only then the reaction. That is at least one extra tick, more if `then` settles later.\n\nThe same cost hides in `return p` from an async function: its own promise is resolved with `p`, so it pays that job, and `p.then` queues one more: two extra ticks. `return await p` pays one tick, then resolves with a plain value. MDN says `return await promise` is at least as fast as `return promise` [[c:return-await-fast]]. `new Promise((r) => r(p))` pays the two extra ticks as well; `Promise.resolve(p)` returns `p` itself.\n\nNever build logic on tick counts. Expect them in interview puzzles.",
+      "claims": [
+        {
+          "id": "thenable-job",
+          "text": "Resolving a promise with a thenable defers the chaining to a PromiseResolveThenableJob.",
+          "sources": [
+            "v8-fast-async",
+            "mdn-promise-constructor"
+          ],
+          "evidence": [
+            {
+              "source": "v8-fast-async",
+              "quote": "This does deferred chaining of these promises on the next turn, expressed via what the specification calls a PromiseResolveThenableJob."
+            },
+            {
+              "source": "mdn-promise-constructor",
+              "quote": "If it's called with a thenable value (including another Promise instance), then the thenable's then method is saved and called in the future (it's always called asynchronously)."
+            }
+          ]
+        },
+        {
+          "id": "return-await-fast",
+          "text": "return await promise is at least as fast as return promise.",
+          "sources": [
+            "mdn-await"
+          ],
+          "evidence": [
+            {
+              "source": "mdn-await",
+              "quote": "Contrary to some popular belief, return await promise is at least as fast as return promise, due to how the spec and engines optimize the resolution of native promises."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "question",
+      "item": "a-thenable-ticks"
+    },
+    {
+      "type": "question",
+      "item": "a-thenable-ticks",
+      "variant": "v2"
+    },
+    {
+      "type": "concept",
+      "id": "c-puzzles",
+      "title": "A method for ordering puzzles",
+      "text": "For any mix of async functions, `then` chains and timers:\n\n1. Run the script line by line. Log the synchronous output: async function bodies up to their first `await`, and promise executors.\n2. Keep two lists: microtasks in queueing order, and tasks (timers by deadline).\n3. Drain microtasks one by one. Each may append more: the next chain hop, the code after the next `await`.\n4. Only when the list is empty, take one task, then drain again.\n\nMost mistakes come from step 3. A hop is queued only when the previous handler runs. `await asyncFn()` costs extra ticks when `asyncFn` returns a promise, because its own promise is resolved with a thenable [[c:thenable-adopt]].",
+      "claims": [
+        {
+          "id": "thenable-adopt",
+          "text": "A promise resolved with a thenable adopts the thenable's state.",
+          "sources": [
+            "mdn-promise-constructor"
+          ],
+          "evidence": [
+            {
+              "source": "mdn-promise-constructor",
+              "quote": "The promise may still be pending because it's resolved with another thenable, but its eventual state will match that of the resolved thenable."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "question",
+      "item": "a-ordering-puzzle"
+    },
+    {
+      "type": "concept",
+      "id": "c-async-errors",
+      "title": "Errors: return vs return await, late handlers",
+      "text": "`try/catch` sees a rejection only if it is awaited inside the `try`. `return p` leaves the block at once and hands `p` on, so its rejection skips the `catch`; `return await p` throws inside the `try` [[c:await-throws]]. A call neither awaited nor returned has no handler at all.\n\nA rejection with no handler by the time microtasks have drained is reported. Browsers fire `unhandledrejection` [[c:browser-unhandled]]. Node's default mode `throw` turns it into an uncaught exception that ends the process [[c:node-unhandled-throw]]. A handler attached in a later task is too late [[c:late-handler]].\n\nClassic trap: `await slow; await fast;` where `fast` rejects first. Nothing listens to `fast` yet [[c:sequential-await-unhandled]]. `Promise.all` attaches both handlers at once.",
+      "claims": [
+        {
+          "id": "await-throws",
+          "text": "await throws a rejection where it stands; a returned promise rejects after the function has returned.",
+          "sources": [
+            "mdn-await"
+          ],
+          "evidence": [
+            {
+              "source": "mdn-await",
+              "quote": "If the Promise is rejected, the rejected value is thrown."
+            },
+            {
+              "source": "mdn-await",
+              "quote": "the promise is rejected after it has already been returned from noAwait"
+            }
+          ]
+        },
+        {
+          "id": "browser-unhandled",
+          "text": "Browsers send unhandledrejection when a promise with no handler is rejected.",
+          "sources": [
+            "mdn-unhandledrejection"
+          ],
+          "evidence": [
+            {
+              "source": "mdn-unhandledrejection",
+              "quote": "The unhandledrejection event is sent to the global scope of a script when a JavaScript Promise that has no rejection handler is rejected; typically, this is the window, but may also be a Worker."
+            }
+          ]
+        },
+        {
+          "id": "node-unhandled-throw",
+          "text": "Node's default throw mode raises an unhandled rejection as an uncaught exception.",
+          "sources": [
+            "node-cli"
+          ],
+          "evidence": [
+            {
+              "source": "node-cli",
+              "quote": "throw: Emit unhandledRejection. If this hook is not set, raise the unhandled rejection as an uncaught exception. This is the default."
+            }
+          ]
+        },
+        {
+          "id": "late-handler",
+          "text": "A handler attached after a turn of the event loop is late.",
+          "sources": [
+            "node-process"
+          ],
+          "evidence": [
+            {
+              "source": "node-process",
+              "quote": "The 'rejectionHandled' event is emitted whenever a Promise has been rejected and an error handler was attached to it (using promise.catch(), for example) later than one turn of the Node.js event loop."
+            }
+          ]
+        },
+        {
+          "id": "sequential-await-unhandled",
+          "text": "Sequential awaits can leave an early rejection unhandled.",
+          "sources": [
+            "mdn-async-function"
+          ],
+          "evidence": [
+            {
+              "source": "mdn-async-function",
+              "quote": "In sequentialWait, if promise fast rejects before promise slow is fulfilled, then an unhandled promise rejection error will be raised, regardless of whether the caller has configured a catch clause."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "question",
+      "item": "a-try-return",
+      "variant": "v2"
+    },
+    {
+      "type": "question",
+      "item": "a-unhandled"
+    },
+    {
+      "type": "recap",
+      "points": [
+        "An async function runs synchronously to its first await; each await on a native promise costs one microtask (it used to be three).",
+        "await null and await 42 still yield to every microtask already queued.",
+        "`return p` from an async function and `new Promise(r => r(p))` cost two extra ticks, other thenables at least one; `return await p` is not slower.",
+        "try/catch only catches what is awaited inside the try: `return p` skips the catch.",
+        "A rejection with no handler when microtasks drain is reported; `await slow; await fast` leaves `fast` unhandled, Promise.all does not."
+      ]
+    }
+  ],
+  "items": [
+    {
+      "id": "a-await-ticks",
+      "concept": "c-await-tick",
+      "bloom": "apply",
+      "recallFirst": true,
+      "sources": [
+        "v8-fast-async",
+        "mdn-await"
+      ],
+      "variants": [
+        {
+          "id": "v1",
+          "stem": "What does this log in a current engine?\n```js\nconst p = Promise.resolve();\n(async () => {\n  await p;\n  console.log('await');\n})();\np.then(() => console.log('a'))\n  .then(() => console.log('b'));\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`await a b`",
+              "correct": true,
+              "why": "`await p` on a native fulfilled promise queues one reaction, before `a`'s. `b` is queued only when `a` runs."
+            },
+            {
+              "id": "b",
+              "text": "`a b await`",
+              "why": "That was the old three-tick await, from before the spec change. Awaiting a native promise now costs one tick, so its reaction is queued before `a`."
+            },
+            {
+              "id": "c",
+              "text": "`a await b`",
+              "why": "This is a two-tick await. `await p` uses `p` itself, so its reaction is queued first, right when the function suspends."
+            }
+          ],
+          "runs": true
+        },
+        {
+          "id": "v2",
+          "stem": "What does this log?\n```js\nconst log = console.log;\nasync function f(n) {\n  log(n + 1);\n  await 0;\n  log(n + 2);\n  await 0;\n  log(n + 3);\n}\nf('a');\nf('b');\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`a1 b1 a2 b2 a3 b3`",
+              "correct": true,
+              "why": "Each call runs to its first `await`, then returns. Each `await 0` costs one tick, so the two calls take turns."
+            },
+            {
+              "id": "b",
+              "text": "`a1 a2 a3 b1 b2 b3`",
+              "why": "`await 0` still yields, even for a non-promise. `f('b')` starts before `f('a')` resumes."
+            },
+            {
+              "id": "c",
+              "text": "`a1 b1 a2 a3 b2 b3`",
+              "why": "A resumed function does not keep running past its next `await`. Each `await` queues it behind the other call's continuation."
+            }
+          ],
+          "runs": true
+        }
+      ]
+    },
+    {
+      "id": "a-thenable-ticks",
+      "concept": "c-thenables",
+      "bloom": "analyse",
+      "recallFirst": true,
+      "sources": [
+        "v8-fast-async",
+        "mdn-await",
+        "ecma-control-abstraction"
+      ],
+      "variants": [
+        {
+          "id": "v1",
+          "stem": "What does this log?\n```js\nconst log = console.log;\nconst t = { then(r) { r(); } };\n(async () => {\n  await t;\n  log('t');\n})();\nPromise.resolve().then(() => log('1'))\n  .then(() => log('2'))\n  .then(() => log('3'));\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`1 t 2 3`",
+              "correct": true,
+              "why": "`t` is not a native promise, so it is wrapped. One job calls `t.then`, which fulfils the wrapper, then a second job resumes the function. `1` runs between them."
+            },
+            {
+              "id": "b",
+              "text": "`t 1 2 3`",
+              "why": "That is the order for a native promise. A plain thenable costs an extra tick: its `then` must be called in its own job first."
+            },
+            {
+              "id": "c",
+              "text": "`1 2 3 t`",
+              "why": "Awaiting a thenable is slower but not a task. Its jobs are microtasks and interleave with the chain."
+            }
+          ],
+          "runs": true
+        },
+        {
+          "id": "v2",
+          "stem": "What does this log?\n```js\nconst log = console.log;\nconst p = Promise.resolve();\nasync function a() { return p; }\nasync function b() { return await p; }\na().then(() => log('a'));\nb().then(() => log('b'));\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`b a`",
+              "correct": true,
+              "why": "`b` pays one tick for `await p`, then resolves with a plain value. `a` resolves its promise with `p`, a thenable, which costs extra ticks."
+            },
+            {
+              "id": "b",
+              "text": "`a b`",
+              "why": "This assumes `return p` skips work by not awaiting. Resolving an async function's promise with a promise adds a thenable job."
+            },
+            {
+              "id": "c",
+              "text": "The order varies between runs",
+              "why": "Microtask order is fully specified. Only tasks that depend on outside timing can vary."
+            }
+          ],
+          "runs": true
+        },
+        {
+          "id": "v3",
+          "stem": "What does this log?\n```js\nconst log = console.log;\nconst p = Promise.resolve();\nnew Promise((r) => r(p))\n  .then(() => log('n'));\nPromise.resolve(p).then(() => log('r'));\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`r n`",
+              "correct": true,
+              "why": "`Promise.resolve(p)` returns `p` itself, so `r` is queued at once. `r(p)` resolves with a thenable and pays two extra ticks."
+            },
+            {
+              "id": "b",
+              "text": "`n r`",
+              "why": "Registration order is not queue order. The `new Promise` is still pending while the thenable job runs."
+            },
+            {
+              "id": "c",
+              "text": "`n` only",
+              "why": "Resolving with a promise is legal: the new promise adopts its state. Both handlers run."
+            }
+          ],
+          "runs": true
+        }
+      ]
+    },
+    {
+      "id": "a-ordering-puzzle",
+      "concept": "c-puzzles",
+      "bloom": "analyse",
+      "recallFirst": true,
+      "sources": [
+        "mdn-await",
+        "v8-fast-async",
+        "mdn-promise-constructor"
+      ],
+      "variants": [
+        {
+          "id": "v1",
+          "stem": "What does this log?\n```js\nconst log = console.log;\nasync function f() {\n  log('B');\n  await g();\n  log('E');\n}\nasync function g() { log('C'); }\nlog('A');\nsetTimeout(() => log('H'));\nf();\nnew Promise((r) => { log('D'); r(); })\n  .then(() => log('F'));\nlog('G');\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`A B C D G E F H`",
+              "correct": true,
+              "why": "Sync: A, B, C (g runs inside f), D (executor), G. Then microtasks: `f` resumes (E) before F, queued later. The timer task is last."
+            },
+            {
+              "id": "b",
+              "text": "`A B C D G F E H`",
+              "why": "This charges `await g()` extra ticks. `g` returns `undefined`, so its promise is a fulfilled native promise and the await costs one tick."
+            },
+            {
+              "id": "c",
+              "text": "`A B D G C E F H`",
+              "why": "An async function's body runs synchronously when called, so `g` logs C before `f` reaches its `await`."
+            }
+          ],
+          "runs": true
+        },
+        {
+          "id": "v2",
+          "stem": "What does this log?\n```js\nconst log = console.log;\nasync function f() {\n  await g();\n  log('f');\n}\nasync function g() {\n  return Promise.resolve();\n}\nf();\nPromise.resolve()\n  .then(() => log('1'))\n  .then(() => log('2'))\n  .then(() => log('3'));\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`1 2 f 3`",
+              "correct": true,
+              "why": "`g` returns a promise, so its own promise is resolved with a thenable: two ticks. Then `await` costs one more, so `f` lands just before 3."
+            },
+            {
+              "id": "b",
+              "text": "`f 1 2 3`",
+              "why": "That holds if `g` returned a plain value. Returning a promise from an async function adds a thenable job and a reaction."
+            },
+            {
+              "id": "c",
+              "text": "`1 f 2 3`",
+              "why": "This counts only one extra tick. Adopting a thenable takes a job to call `then` and a job to run its reaction, before the await's own tick."
+            }
+          ],
+          "runs": true
+        }
+      ]
+    },
+    {
+      "id": "a-try-return",
+      "concept": "c-async-errors",
+      "bloom": "analyse",
+      "recallFirst": true,
+      "sources": [
+        "mdn-await",
+        "mdn-async-function"
+      ],
+      "variants": [
+        {
+          "id": "v1",
+          "stem": "What does this log?\n```js\nconst log = console.log;\nconst fail = async () => { throw 'x'; };\nasync function load() {\n  try {\n    return fail();\n  } catch {\n    return 'fallback';\n  }\n}\nload().then(log, (e) => log('rejected', e));\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`rejected x`",
+              "correct": true,
+              "why": "`fail()` returns a rejected promise; no exception is thrown in the `try`. `return` hands it on and `load()` rejects with `x`."
+            },
+            {
+              "id": "b",
+              "text": "`fallback`",
+              "why": "`catch` only sees a rejection that is awaited inside the `try`. `return fail()` returns before the rejection is unwrapped."
+            },
+            {
+              "id": "c",
+              "text": "Nothing: the rejection is unhandled",
+              "why": "The caller passes a rejection handler to `then`, and `load()`'s promise adopts the rejection, so it is handled there."
+            }
+          ],
+          "runs": true
+        },
+        {
+          "id": "v2",
+          "stem": "In an ES module, what does this log?\n```js\nconst fail = async () => { throw 'x'; };\nasync function a() {\n  try { return fail(); }\n  catch { return 'A'; }\n}\nasync function b() {\n  try { return await fail(); }\n  catch { return 'B'; }\n}\nconst all = [a(), b()];\nconst r = await Promise.allSettled(all);\nconst out = r.map((s) => s.value ?? s.reason);\nconsole.log(...out);\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`x B`",
+              "correct": true,
+              "why": "Only `return await` unwraps the rejection inside the `try`, so only `b` falls back. `a` rejects with `x`."
+            },
+            {
+              "id": "b",
+              "text": "`A B`",
+              "why": "This treats `return fail()` like `return await fail()`. Without `await` the rejection is never thrown inside the `try`."
+            },
+            {
+              "id": "c",
+              "text": "`x x`",
+              "why": "`await` turns the rejection into a throw at that line, inside the `try`, so `b`'s `catch` runs."
+            }
+          ],
+          "runs": true
+        },
+        {
+          "id": "v3",
+          "stem": "What does this log?\n```js\nconst log = console.log;\nprocess.on('unhandledRejection', (e) => {\n  log('unhandled', e);\n});\nconst fail = async () => { throw 'x'; };\nasync function load() {\n  try {\n    fail();\n    return 'ok';\n  } catch {\n    return 'fallback';\n  }\n}\nload().then(log);\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`ok unhandled x`",
+              "correct": true,
+              "why": "`fail()` returns a rejected promise that nobody handles. `load` returns `ok`; after microtasks drain, Node reports the rejection."
+            },
+            {
+              "id": "b",
+              "text": "`fallback`",
+              "why": "An async function never throws synchronously to its caller. It returns a rejected promise, which `try` cannot see unless awaited."
+            },
+            {
+              "id": "c",
+              "text": "`ok`",
+              "why": "The rejection is not lost. With no handler, Node reports it as unhandled, here through the listener."
+            }
+          ],
+          "runs": true
+        }
+      ]
+    },
+    {
+      "id": "a-unhandled",
+      "concept": "c-async-errors",
+      "bloom": "analyse",
+      "recallFirst": true,
+      "sources": [
+        "mdn-async-function",
+        "node-process"
+      ],
+      "variants": [
+        {
+          "id": "v1",
+          "stem": "What does this log in Node?\n```js\nconst log = console.log;\nprocess.on('unhandledRejection', (e) => {\n  log('unhandled', e);\n});\nconst wait = (ms, ok) => new Promise((r, j) =>\n  setTimeout(() => (ok ? r() : j('E')), ms));\n(async () => {\n  const slow = wait(20, true);\n  const fast = wait(10, false);\n  try {\n    await slow;\n    await fast;\n  } catch (e) {\n    log('caught', e);\n  }\n})();\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`unhandled E caught E`",
+              "correct": true,
+              "why": "`fast` rejects at 10 ms while the function still waits on `slow`, so no handler exists yet. At 20 ms `await fast` attaches one, too late."
+            },
+            {
+              "id": "b",
+              "text": "`caught E`",
+              "why": "`try` covers the `await fast` line, not the promise. Until that line runs, `fast` has no handler."
+            },
+            {
+              "id": "c",
+              "text": "`caught E unhandled E`",
+              "why": "Node does not wait for the process to end. It checks for unhandled rejections each time the microtask queue drains, here right after the 10 ms timer."
+            }
+          ],
+          "runs": true
+        },
+        {
+          "id": "v2",
+          "stem": "What does this log in Node?\n```js\nconst log = console.log;\nprocess.on('unhandledRejection', (e) => {\n  log('unhandled', e);\n});\nconst wait = (ms, ok) => new Promise((r, j) =>\n  setTimeout(() => (ok ? r() : j('E')), ms));\n(async () => {\n  const slow = wait(20, true);\n  const fast = wait(10, false);\n  try {\n    await Promise.all([slow, fast]);\n  } catch (e) {\n    log('caught', e);\n  }\n})();\n```",
+          "options": [
+            {
+              "id": "a",
+              "text": "`caught E`",
+              "correct": true,
+              "why": "`Promise.all` attaches handlers to both promises at once, so `fast`'s rejection is handled at 10 ms and fails the `all` early."
+            },
+            {
+              "id": "b",
+              "text": "`unhandled E caught E`",
+              "why": "That is the sequential `await slow; await fast` case. `Promise.all` subscribes to `fast` before it rejects."
+            },
+            {
+              "id": "c",
+              "text": "`unhandled E`",
+              "why": "`Promise.all` rejects as soon as one input rejects, and the `await` inside `try` sees it."
+            }
+          ],
+          "runs": true
+        }
+      ]
+    }
+  ]
+}
