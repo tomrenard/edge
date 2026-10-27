@@ -21,7 +21,7 @@ export const auth = betterAuth({
     provider: "pg",
     schema: { user, session, account, verification },
   }),
-  emailAndPassword: { enabled: true, minPasswordLength: 10 },
+  emailAndPassword: { enabled: true, minPasswordLength: 8 },
   // Login and signup go through the pages' server actions (with the database-backed lockout);
   // the raw HTTP routes would skip it.
   disabledPaths: ["/sign-in/email", "/sign-up/email"],

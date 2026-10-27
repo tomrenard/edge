@@ -7,7 +7,7 @@ import { auth } from "@/lib/auth";
 const ERRORS: Record<string, string> = {
   invite: "This email isn't invited. Ask Tom to add it.",
   taken: "There is already an account with this email. Log in instead.",
-  password: "Check the email, and use a password of 10 or more characters.",
+  password: "Check the email, and use a password of 8 or more characters.",
   other: "Something went wrong. Try again.",
 };
 
@@ -70,7 +70,7 @@ export default async function SignupPage({
         autoComplete="new-password"
         aria-label="Password"
         placeholder="Password (10+ characters)"
-        minLength={10}
+        minLength={8}
         required
         className="field"
       />
